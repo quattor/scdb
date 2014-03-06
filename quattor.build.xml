@@ -326,6 +326,9 @@
     <property file="${cluster.location}/cluster.group.build.properties" />
 
     <property name="cluster.include" value="${cluster.location}"/>
+    <!-- Default value defined here. Can be overriden in cluster.build.properties or
+         cluster.group.build.properties -->
+    <property name="cluster.pan.dep.ignore" value="${pan.dep.ignore}"/>
     <!-- Define the load path.  By default this is just the cluster area. -->
     <path id="pan.loadpath">
       <dirset dir="${cluster.include}"
