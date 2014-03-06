@@ -57,7 +57,8 @@ do
     echo "Error: ${repos_parent} is not a valid repository parent"
     continue
   fi
-  repos_dirs=$(find ${repos_parent} -type d)
+  # Add a trailing / to repos_parent in case this is a symlink
+  repos_dirs=$(find -L ${repos_parent}/ -type d -or -type l)
   
   for dir in $repos_dirs
   do
@@ -89,11 +90,14 @@ do
     
     log_file=/tmp/$(basename $0)$(echo $dir|sed -e 's%/%_%g').err
     createrepo ${createrepo_opts} ${rpm_group_file} ${dir} >/dev/null 2> ${log_file}
-    if [ $? -ne 0 -o -s ${log_file} ]
+    if [ $? -ne 0 ]
     then
       echo "Failed to update YUM metadata in $dir (see ${log_file} for details"
     else
-      rm -f ${log_file}
+      if [ ! -s  ${log_file} ]
+      then
+        rm -f ${log_file}
+      fi
     fi
   done
 done
