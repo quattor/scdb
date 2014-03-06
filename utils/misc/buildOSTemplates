@@ -1,0 +1,287 @@
+#!/bin/sh
+#
+# Script to produce OS templates from a Red Hat style OS distribution.
+# This is a wrapper over 3 tools used to do the real work :
+#    - rpmProvides.pl : scans all RPMs and produces a list of all feature
+#                       provided by RPMS
+#    - rpmRequires.pl : with output from previous script, produces a list
+#                       of all RPMs presents with their required packages.
+#    - comps2pan.xsl : produces one template per group present in comps.xml,
+#                      adding all groups and packages listed in group definition
+#                      and their dependencies.
+#
+# Written by Michel Jouvin <jouvin@lal.in2p3.fr>
+#
+# Copyright (c) 2004 by Michel Jouvin and Le Centre National de
+# la Recherche Scientifique (CNRS).  All rights reserved.
+
+# The software was distributed with and is covered by the European
+# DataGrid License.  A copy of this license can be found in the included
+# LICENSE file.  This license can also be obtained from
+# http://www.eu-datagrid.org/license.
+
+
+
+usage () {
+  echo "Usage: `basename $0` [--namespace pan_ns] Distrib_Root Templates_Dir"
+  echo ""
+  echo "    --compsdir : name of directory under Distrib_Root containing comps.xml or file name passed with --compsxml"
+  echo "    --compsxml : name of xml file describing packages to be installed if different from comps.xml"
+  echo "    --debug : enable (very) verbose option in called tools."
+  echo "              Use several times to increase verbosity."
+  echo "    --depdb db_file : execute only last phase using an already existing"
+  echo "                      dependency DB."
+  echo "    --namespace pan_ns : use a non default PAN namespace. Default should be appropriate"
+  echo "    --rpmdir : name of directory under Distrib_Root containing RPMs"
+  echo "    --scdbroot : path of SCDB top-level directory (must contain externals/). Default to"
+  echo "                 current directory. As an alternative, define environment variable QUATTOR_SCDB_ROOT."
+  echo ""
+  echo "    Distrib_Root : directory containing both a 'base' and"
+  echo "                   a 'RPMS' directory."
+  echo "    Template_Dir : directory where to put the generated templates."
+  echo ""
+  exit 1
+}
+
+debug=0
+requirementsList=""
+ns_option=""
+
+while [ -n "`echo $1 | grep '^--'`" ]
+do
+  case $1 in
+  --compsdir)
+        shift
+        distrib_comps="$1"
+        ;;
+
+  --compsxml)
+        shift
+        comps_xml="$1"
+        ;;
+
+  --debug)
+         let "debug=debug+1"
+         ;;
+         
+  --depdb)
+         shift
+         requirementsList=$1
+         ;;
+         
+  --namespace)
+         shift
+         ns_option="namespace=$1"
+         ;;
+
+  --rpmdir)
+        shift
+        distrib_rpms="$1"
+        ;;
+
+  --scdbroot)
+        shift;
+        scdb_root="$1"
+        ;;
+        
+	*)
+         echo "Unknown option ($1)"
+         usage
+         ;;
+             
+  esac
+
+  shift
+done
+
+
+if [ -z "$1" -o -z "$2" ]
+then
+  echo "Error : Missing required parameters".
+  usage
+fi
+
+distrib_root=$1
+templates_dir=$2
+tools_dir=`dirname $0`
+rpmProvides="${tools_dir}/rpmProvides.pl"
+rpmRequires="${tools_dir}/rpmRequires.pl"
+comps2pan="${tools_dir}/comps2pan.xsl"
+
+# Defaults for RPMS and comps2xml directory (match SL4/RHEL4 layout)
+distrib_rpms=${distrib_rpms:-RPMS}
+distrib_comps=${distrib_comps:-base}
+
+# Defaults for SCDB root
+QUATTOR_SCDB_ROOT=${QUATTOR_SCDB_ROOT:-${PWD}}
+scdb_root=${scdb_root:-${QUATTOR_SCDB_ROOT}}
+echo "Using SCDB working copy in $scdb_root"
+
+# Saxon location
+saxon="${scdb_root}/external/saxon/saxon9.jar"
+echo "Using Saxon from $saxon"
+echo ""
+
+
+
+if [ -d "${distrib_root}" ]
+then
+  if [ ! -d "${distrib_root}/${distrib_rpms}" ]
+  then
+    echo "Error : distribution root directory (${distrib_root}) is not valid (${distrib_rpms} directory missing)"
+    exit 2
+  fi
+  if [ -z "$comps_xml" ]
+  then
+    comps_xml=comps.xml
+  fi
+  comps_xml_file=${distrib_root}/${distrib_comps}/${comps_xml}
+  if [ ! -f "${comps_xml_file}" ]
+  then
+    echo "Error : distribution root directory (${distrib_root}) is not valid (${distrib_comps}/${comps_xml} missing)"
+    exit 2
+  fi
+else
+  echo "Error : distribution root directory (${distrib_root}) not found"
+  exit 2
+fi
+
+if [ ! -d "${templates_dir}" ]
+then
+  echo "Error : templates directory (${templates_dir}) not found"
+  exit 2
+fi
+
+if [ ! -x "${rpmProvides}" ]
+then
+  echo "Error : required tool missing (${rpmProvides})"
+  exit 3
+fi
+
+if [ ! -x "${rpmRequires}" ]
+then
+  echo "Error : required tool missing (${rpmRequires})"
+  exit 3
+fi
+
+if [ ! -f "${comps2pan}" ]
+then
+  echo "Error : required tool missing (${comps2pan})"
+  exit 3
+fi
+
+java -version >/dev/null 2>&1
+if [ $? -ne 0 ]
+then
+  echo "Error : java not found"
+  exit 3
+fi
+
+if [ -f "$saxon" ]
+then
+  export CLASSPATH=$saxon
+else
+  if [ -z "$CLASSPATH" ]
+  then
+    echo "Error : unable to locate Saxon. Define CLASSPATH variable before running this script"
+    exit 3
+  fi
+fi
+
+
+pid=$$
+# Rewrite templates_dir as an absolute path (required by comps2pan.xsl)
+templates_dir=`eval 'cd $templates_dir; pwd'`
+
+
+# Dependency DB doesn't exist. Run all phases.
+
+echo ""
+echo "`date` - Building OS templates for distribution in ${distrib_root}"
+
+if [ -z "${requirementsList}" ]
+then
+	# Build list of feature provided by available RPMs
+	providesList=/tmp/rpmProvides.out.${pid}
+	echo ""
+	echo "Collecting features provided by RPMs. May take a while (15-30 minutes)..."
+	$rpmProvides ${distrib_root}/${distrib_rpms} > ${providesList}
+	if [ $? -eq 0 ]
+	then
+	  echo "Features collected in ${providesList}"
+	else
+	  echo "Error collecting features from RPMs"
+	  exit 4
+	fi
+	
+	
+	# Build list of available packages with their requirements
+	requirementsList=/tmp/rpmRequires.out.${pid}
+	rpmRequiresOpts='-i'
+	if [ $debug -gt 0 ]
+	then
+	  rpmRequiresOpts="$rpmRequiresOpts -v"
+	fi
+	echo ""
+	echo "Building RPM list with their requirements. May take a while (15-30 minutes)..."
+	$rpmRequires ${rpmRequiresOpts} ${providesList} ${distrib_root}/${distrib_rpms} > $requirementsList
+	if [ $? -eq 0 ]
+	then
+	  echo "RPM requirements collected in ${requirementsList}"
+	else
+	  echo "Error collecting requirements from RPMs"
+	  exit 5
+	fi
+
+# Dependency DB option specified, do only the last phase after checking
+# it exists
+else
+  if [ ! -f ${requirementsList} ]
+  then
+    echo "Dependency db (${requirementsList}) not found."
+    exit 2
+  fi
+fi
+
+
+# Produce templates
+
+echo ""
+echo "Generating templates in ${templates_dir}..."
+echo "    Dependency DB = ${requirementsList}"
+echo "    comps.xml = ${comps_xml_file}"
+echo ""
+
+comps2panOpts=""
+if [ ${debug} -gt 0 ]
+then
+  comps2panOpts="debug=${debug}"
+fi
+java -Xss1M net.sf.saxon.Transform ${comps_xml_file} $comps2pan depdb=${requirementsList} \
+                                                                output-dir=${templates_dir} \
+                                                                ${ns_option} \
+                                                                ignore.missing.rpm='true' \
+                                                                ignore.duplicates='true' \
+                                                                ${comps2panOpts}
+if [ $? -ne 0 ]
+then
+  echo "Error generating templates"
+  exit 6
+fi
+
+
+# Add new templates to SVN if needed.
+# Will be ignored if SVN is not installed on the machine.
+svn_info=`svn info ${templates_dir} 2>& 1`
+if [ $? -eq 0 ]
+then
+  echo ""
+  echo "Checking Subversion workspace..."
+  new_files=`svn status ${templates_dir} | grep '?' | awk '{print $NF}'`
+  if [ -n "${new_files}" ]
+  then
+    echo "Adding new templates..."
+    svn add ${new_files}
+  fi
+fi
+

@@ -1,0 +1,23 @@
+= Introduction =
+groupandpasswd2tpl is intended for use when bringing an existing system under
+quattor control. It reads the contents of /etc/passwd, /etc/group, 
+(and /etc/shadow if run with appropriate permissions) and uses the 
+information from these files to generate a Pan template suitable for 
+configuring all accounts found using quattor's ncm-accounts component. The 
+Pan code is written to standard out, and should be redirected to a file.
+
+= Usage =
+groupandpasswd2tpl [-g group file] [-p passwd file] [-s shadow file] [-t template name]"
+
+The -g, -p, and -s options can be used to specify non-standard locations for
+the group, passwd, and shadow password files respectively.
+
+The -t option can be used to specify the template name embedded in the 
+generated code. The default is "users/sysusersgroups" which will 
+generate the line:
+
+template users/sysusersgroups;
+
+= Notes =
+If run as non-root, the generated template will probably not contain passwords,
+as it is not possible to read the shadow password file.

@@ -1,0 +1,103 @@
+#!/usr/bin/python
+
+# Author: Stephen Childs <childss@cs.tcd.ie>
+# Copyright: 2008 Trinity College Dublin
+# License: Apache 2
+
+
+import getopt, sys
+
+GROUPFILE="/etc/group"
+PASSWDFILE="/etc/passwd"
+SHADOWFILE="/etc/shadow"
+TPLNAME="users/sysusersgroups"
+
+def usage():
+    print "%s [-g group file] [-p passwd file] [-s shadow file] [-t template name]" %(sys.argv[0])
+
+# get options: target file
+try:
+    optlist,args = getopt.getopt(sys.argv[1:],"d:t:x:c:r:gp")
+except getopt.GetoptError:
+    usage()
+    sys.exit()
+
+
+for o, a in optlist:
+    if o == "-g":
+        GROUPFILE=a
+    if o == "-p":
+        PASSWDFILE=a
+    if o == "-s":
+        SHADOWFILE=a
+    if o == "-t":
+        TPLNAME=a
+    if o == "-h" or o == "--help":
+        usage()
+
+
+
+pwdfile=open(GROUPFILE,"r")
+
+print "template "+ TPLNAME+";"
+
+groupmap= {}
+pwdmap={}
+
+for account in pwdfile:
+    account=account.strip()
+    fields=account.split(":")
+    (name,foo,gid,users)= fields
+    groupmap[gid]=name
+
+    tplstring='''
+"/software/components/accounts/groups/%s" =
+    nlist(
+       "gid", %s
+       );
+''' %(name,gid)
+    
+    print tplstring
+
+shdfile=0
+try:
+    shdfile=open(SHADOWFILE,"r")
+except IOError:
+    sys.stderr.write("Couldn't open file "+SHADOWFILE+", no passwords in output.")
+
+if shdfile:
+    for account in shdfile:
+        account=account.strip()
+        fields=account.split(":")
+        name=fields[0]
+        pwd=fields[1]
+        pwdmap[name]=pwd
+
+pwdfile=open(PASSWDFILE,"r")
+
+for account in pwdfile:
+    account=account.strip()
+    fields=account.split(":")
+    (name,foo,uid,gid,comment,home,shell)= fields
+
+    group=""
+    if gid in groupmap:
+        group = '''
+       "groups",  list('%s'),''' %(groupmap[gid])
+
+    password=""
+    if name in pwdmap:
+        password = '''
+       "password", "%s",''' % (pwdmap[name])
+
+    tplstring='''
+"/software/components/accounts/users/%s" =
+    nlist(
+       "uid", %s, %s
+       "comment", "%s", %s
+       "homeDir", "%s",
+       "shell", "%s",
+       );
+''' %(name,uid,group,comment,password,home,shell)
+    
+    print tplstring

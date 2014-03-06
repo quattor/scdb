@@ -1,0 +1,171 @@
+#!/usr/bin/perl
+#
+# Script to produce a template adding the packages corresponding to the
+# RPMs present in a RPM repository or in file listing all RPMs as URLs
+#
+# 2 common uses of this script are :
+#  - Producing a template adding all trusted CAs.
+#  - Producing a template adding all required RPMs for a gLite service from
+#    the standard gLite description.
+#
+# Written by Michel Jouvin - LAL / CNRS - <jouvin@lal.in2p3.fr>
+
+use strict;
+use File::Basename;
+use Getopt::Long;
+
+
+# Obsolete RPMs are sometimes still distributed... (e.g. obsolete CAs) 
+# RPMS listed here will be included in the template commented out.
+# Value has no importance, can be set to the version where it has been obsoleted
+my %obsolete_rpms = ( "lcg_FNAL_KCA" => "1.7-1",
+                   );
+
+
+my $rpms_dir = ".";
+my $rpm_list = undef;
+my $template_name = undef;
+my $pan_ns = undef;
+my $verbose = 0;
+
+
+# Process the script arguments
+
+my %options = ();
+&GetOptions(\%options, "help", 
+                       "namespace=s", 
+                       "rpmlist=s",
+                       "template=s",
+                       "url=s",
+                       "verbose") or usage();
+
+if ( defined($options{help}) ) {
+  usage();
+}
+
+if ( defined($options{verbose}) ) {
+  $verbose = 1;
+}
+ 
+if ( defined($options{namespace}) ) {
+  $pan_ns = $options{namespace};
+}
+ 
+if ( defined($options{template}) ) {
+  $template_name = $options{template};
+}
+ 
+if ( defined($options{rpmlist}) ) {
+  $rpm_list = $options{rpmlist};
+}
+
+if ( defined($options{url}) ) {
+  print STDERR ("Not yet implemented");
+  exit 3;
+}
+ 
+my @rpms;
+if ( defined($rpm_list) ) {
+  open (RPMSLIST, $rpm_list) || die 'Unable to open RPMs list '.$rpm_list;
+  @rpms = grep (/\.rpm/, <RPMSLIST>);
+  close RPMSLIST;
+  for (my $i=0; $i<@rpms; $i++) {
+    $rpms[$i] =~ s%^.*/%%;
+  }
+  
+} else {
+  if ( @ARGV == 0 ) {
+    print STDERR "Missing RPMs directory or an RPM list\n";
+    usage();
+  }
+  $rpms_dir = $ARGV[0];
+  if ( ! -d $rpms_dir ) {
+    print STDERR "RPM directory ($rpms_dir) not found\n";
+    exit 2;
+  }
+
+  opendir (RPMSDIR, $rpms_dir) || die 'Unable to get current directory listing';
+  @rpms = grep /\.rpm$/, readdir(RPMSDIR);
+  close RPMSDIR;
+}
+
+my $first = 1;
+
+my $pan_name;
+if ( defined($template_name) ) {
+  $pan_name = basename($template_name,'.tpl');  
+} else {
+  $pan_name = 'config';
+}
+
+if ( defined($pan_ns) && ($pan_ns !~ /\/$/) ) {
+  $pan_ns .= '/';
+}
+
+my $template_handle;
+if ( defined($template_name) ) {
+  open(TEMPLATE, ">$template_name") || die "Error creating template $template_name";
+}
+
+for my $rpm (@rpms) {
+  if ( $first ) {
+    $first = 0;
+    if ( defined($template_name) ) {
+      print TEMPLATE "unique template ".$pan_ns.$pan_name.";\n\n";
+    } else {
+      print "unique template ".$pan_ns.$pan_name.";\n\n";      
+    }
+  }
+
+  if ( $verbose ) {
+    print STDERR "Processing $rpm\n";
+  }
+  my ($name, $version, $release, $arch) = ($rpm =~ m/\s*(.+)-((?:[^-]+)-(?:[^-]+))\.([^\.]+)\.rpm\s*$/);
+  unless ( $name ) {
+    print STDERR "Skipping $rpm (doesn't match a RPM name)\n";
+  }
+  my $prefix = '';
+  if ( exists($obsolete_rpms{$name}) ) {
+    $prefix = '#';
+  }
+  if ( defined($template_name) ) {
+    print TEMPLATE $prefix."'/software/packages' = pkg_repl('$1', '$2', '$3');\n";
+  } else {
+    print $prefix."'/software/packages' = pkg_repl('$1', '$2', '$3');\n";    
+  }
+
+}
+
+
+# Print the usage instructions for this script.
+sub usage {
+  print << 'EOF'
+Usage:  createPackagesTemplate [--namespace pan_namespace] \
+                               [--template template_name] \
+                               [--rpmlist rpm_list] \
+                               [--url Source_URL] \
+                               [--verbose] \
+                               [RPM_directory]
+
+    --namespace (-n) pan_namespace : PAN namespace to use
+    
+    --rpmlist (-r) file : a file with a list of RPM, one per line.
+                     Each RPM can be a URL or a file specification.
+         
+    --template (-t) file : name of the template to create. If not present, defaults
+                      to stdout and PAN template name defaults to 'config'.
+
+    --url (-u) Source_URL : URL to download RPMs from before producing the template.
+                       All missing RPMs will be downloaded to RPM_Directory. 
+    
+    --verbose (-v) : verbose output
+    
+    'RPM_directory' is a directory path containing the RPMs to be included.
+    This parameter is ignored if '--rpmlist' is specified, required otherwise.
+    All RPMs in this directory are included in the template.
+     
+EOF
+;
+
+  exit 1;
+}

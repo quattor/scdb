@@ -1,0 +1,89 @@
+#!/bin/sh
+
+if [ $# -ne 2 ]
+then
+ echo "Usage : $0 os_name os_arch"
+ echo "os_name :"
+ echo "   SL308"
+ echo "   SL440"
+ echo "   SL450"
+ echo "   SL460"
+ echo "   SL470"
+ echo "   SL520"
+ echo "os_arch :"
+ echo "   x86_64"
+ echo "   i386"
+ exit 0
+fi
+
+## USER VARIABLE
+LOCAL_REP_PREFIX="/www/htdocs/packages/os/"
+LOCAL_REP_SUFFIX="errata"
+#DIST_REP_PREFIX="http://ftp.scientificlinux.org/linux/scientific/"
+DIST_REP_PREFIX="rsync://rsync.scientificlinux.org/scientific/"
+DIST_REP_SUFFIX="/errata/SL/RPMS/"
+
+## SYSTEM VARIABLE
+#BIN=/usr/bin/wget
+#OPTIONS="-nd -r -l1 -q --no-parent -A.rpm"
+BIN=/usr/bin/rsync
+OPTIONS="-azlH"
+
+case $1 in
+ SL308)
+  LOCAL_OS="sl308"
+  REMOTE_OS="308"
+ ;;
+ SL440)
+  LOCAL_OS="sl440"
+  REMOTE_OS="44"
+ ;;
+ SL450)
+  LOCAL_OS="sl450"
+  REMOTE_OS="45"
+  ;;
+ SL460)
+  LOCAL_OS="sl460"
+  REMOTE_OS="46"
+  ;;
+ SL470)
+  LOCAL_OS="sl470"
+  REMOTE_OS="47"
+  ;;
+ SL520)
+  LOCAL_OS="sl520"
+  REMOTE_OS="52"
+  DIST_REP_SUFFIX="/updates/security"
+  ;;
+ SL530)
+  LOCAL_OS="sl530"
+  REMOTE_OS="53"
+  DIST_REP_SUFFIX="/updates/security"
+  ;;
+ *)
+ echo "OS not supported"
+ exit 0
+ ;;
+esac
+
+case $2 in
+ x86_64)
+  LOCAL_ARCH="x86_64"
+  REMOTE_ARCH="x86_64"
+ ;;
+ i386)
+  LOCAL_ARCH="i386"
+  REMOTE_ARCH="i386"
+  ;;
+ *)
+ echo "Arch not supported"
+ exit 0
+ ;;
+esac
+
+LOCAL_REP=$LOCAL_REP_PREFIX/$LOCAL_OS-$LOCAL_ARCH/$LOCAL_REP_SUFFIX
+REMOTE_REP=$DIST_REP_PREFIX/$REMOTE_OS/$REMOTE_ARCH/$DIST_REP_SUFFIX/
+
+mkdir -p $LOCAL_REP
+#cd $LOCAL_REP
+$BIN $OPTIONS $REMOTE_REP/ $LOCAL_REP/

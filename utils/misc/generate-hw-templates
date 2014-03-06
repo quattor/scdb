@@ -1,0 +1,103 @@
+#!/usr/bin/python
+
+"""
+generate-hw-templates : HW templates from CSV file
+
+This script generates Quattor HW templates based on a machine list provided
+as a CSV file, with each line in the following format :
+
+slot_number;server_number;serial_number;mac_address1:mac_address2;mac_ipmi
+
+"""
+
+import sys
+import getopt
+import fileinput
+import re
+
+template_root = "cfg/sites/lal/hardware/machine/200/48a"
+
+machine_re = re.compile(r"^(\d+);(\d*);([\w ]*);([\w ]*);([\w ]*);")
+
+def write_template(rack,slot,serial,macaddr1,macaddr2):
+    skeleton = """
+structure template hardware/machine/200/48a/%s/slot%s;
+
+'location' = '200_48a_ibm2_%s';
+'serialnumber' = '%s';
+
+'cpu' = list(create('hardware/cpu/intel_woodcrest_2300'),
+             create('hardware/cpu/intel_woodcrest_2300'),
+             create('hardware/cpu/intel_woodcrest_2300'),
+             create('hardware/cpu/intel_woodcrest_2300'),
+             create('hardware/cpu/intel_woodcrest_2300'),
+             create('hardware/cpu/intel_woodcrest_2300'),
+             create('hardware/cpu/intel_woodcrest_2300'),
+             create('hardware/cpu/intel_woodcrest_2300'),
+             );
+
+'harddisks' = nlist('sda', create('hardware/harddisk/sata',
+                                 'capacity', 160*GB));
+
+'ram' = list(create('hardware/ram/generic', 'size', 16384*MB));
+
+'cards/nic' = nlist('eth0',create('hardware/nic/tg3'),
+                    'eth1',create('hardware/nic/tg3'));
+
+'cards/nic/eth0/hwaddr' = '%s';
+'cards/nic/eth1/hwaddr' = '%s';
+
+'cards/nic/eth0/boot' = true;
+"""
+
+    name = "%s/%s/slot%s.tpl" % (template_root,rack,slot)
+    # Normalize MAC address with format nn:nn:nn:nn:nn
+    macaddr1 = re.sub(r" ", r":", macaddr1).lower()
+    macaddr2 = re.sub(r" ", r":", macaddr2).lower()
+    contents = skeleton % (rack, slot, slot, serial, macaddr1, macaddr2)
+    
+    print "Writing template %s" % name
+    template = open(name, 'w')
+    template.write(contents)
+    template.close()
+ 
+
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:],'hr:',['help','rack='])
+    
+except getopt.error,detail:
+    print __doc__
+    print detail
+    sys.exit(1)
+
+rack = None
+for opt,value in opts:
+    if opt in ['h','--help']:
+        print __doc__
+        sys.exit(0)
+    elif opt in ['r','--rack']:
+        rack = value
+
+if not rack:
+    print "Error : rack name must be specified (-rack)"
+    sys.exit(1)
+
+i = 0
+for line in fileinput.input(args[0]):
+    i = i + 1
+    #print line
+    m = machine_re.match(line)
+    if m:
+        slot = m.group(1)
+        serial = m.group(3)
+        macaddr1 = m.group(4)
+        macaddr2 = m.group(5)
+        #macaddr_mgt = m.group(6)
+        
+        if serial:
+            write_template (rack,slot, serial, macaddr1, macaddr2)
+
+    #else:
+    #    print "Line %d : no match" % i
+    

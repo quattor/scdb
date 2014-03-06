@@ -1,0 +1,240 @@
+#!/usr/bin/perl
+#
+# Script to update NCM components in a configuration DB based on QWG templates
+# from the version in Quattor Git repositories.
+#
+# Written by Michel Jouvin - LAL / CNRS - <jouvin@lal.in2p3.fr>
+
+use strict;
+use File::Basename;
+use Getopt::Long;
+
+my @component_root;
+my $all_comps = 0;
+my $source;
+my $version;
+my $verbose = 0;
+my @comp_list;
+
+# Process the script arguments
+
+my %options = ();
+&GetOptions(\%options, "all",
+                       "comp-dir=s", 
+                       "core",
+                       "grid",
+                       "help",
+                       "source=s", 
+                       "version=s",
+                       "verbose+") or usage();
+
+if ( defined($options{help}) ) {
+  usage('full');
+}
+
+if ( defined($options{verbose}) ) {
+  $verbose = $options{verbose};
+}
+
+if ( defined($options{version}) ) {
+  $version = $options{version};
+}
+
+if ( defined($options{core}) && defined($options{grid}) ) {
+  print STDERR "Error: --core and --grid are mutualy exclusive.\n";
+  exit 2;
+};
+
+if ( !defined($options{core}) && !defined($options{grid}) ) {
+  print STDERR "Error: either --core or --grid must be specified.\n";
+  usage();
+  exit 2;
+};
+
+unless ( defined($options{source}) ) {
+  print STDERR "Error: no source specified for components\n";
+  usage();
+}
+
+if ( defined($options{all}) ) {
+  $all_comps = 1;
+} else {
+  unless ( @ARGV > 0 ) {
+    print STDERR "Error: no component specified\n";
+    exit 2;
+  }
+}
+
+$source = $options{source};
+$source =~ s%/$%%;
+if ( !-d $source ) {
+  print STDERR "Error : component source ($source) doesn't exist\n";
+  exit 2;
+}
+if ( $all_comps ) {
+  opendir(COMPROOT, $source) || die 'Error reading $source directory';
+  my @tmp_list = grep /^[^\.]/, readdir(COMPROOT);
+  closedir (COMPROOT);
+  foreach my $comp (@tmp_list) {
+    # Ignore everything which is not a directory or doesn't contain a pom.xml file
+    if ( -d "$source/$comp" && -e "$source/$comp/pom.xml" ) {
+      $comp =~ s/^ncm-//;
+      push @comp_list, $comp;
+    }
+  }
+  @comp_list = sort @comp_list;
+} else {
+  @comp_list = @ARGV;
+}
+
+if ( defined($options{'comp-dir'}) ) {
+  push @component_root, $options{'comp-dir'};
+} else {
+  if ( defined($options{core}) ) {
+    push @component_root, 'cfg/standard/components';
+  } else {
+    opendir(GRIDTEMPL, 'cfg/grid') || die 'Error reading cfg/grid directory';
+    my @grid_versions = grep /^[^\.]/, readdir(GRIDTEMPL);
+    closedir (GRIDTEMPL);
+    foreach my $version (@grid_versions) {
+      push @component_root, 'cfg/grid/'.$version.'/components';
+    }
+  }
+}
+foreach my $install_root (@component_root) {
+  unless ( -d $install_root ) {
+    print STDERR "Error: installation directory for templates ($install_root) doesn't exist\n";
+    exit 3;
+  }
+}
+
+if ( $verbose ) {
+  print "\n";
+  print "Component source = $source\n";
+  foreach (@component_root) {
+    print "Installation directory for templates = $_\n";
+  }
+  print "Verbosity level = $verbose\n";
+}
+
+
+# Rebuild and install each component
+
+foreach my $component (@comp_list) {
+  print STDERR "\nBuilding component $component...\n";
+  my $comp_source = "$source/ncm-$component";
+  my @output;
+  if ( $version ) {
+    @output = qx%cd $comp_source; git checkout $version 2>&1%;
+    unless ( $? == 0 ) {
+      print STDERR "Error switching to version $version\n";
+      foreach (@output) {
+        print "$_";
+      }   
+      exit 6;
+    }
+  }
+  @output = qx%cd $comp_source; export PERL5LIB=; mvn clean package 2>&1%;
+  unless ( $? == 0 ) {
+    print STDERR "Error rebuilding component\n";
+    exit 6;
+  }
+  if ( $verbose > 1 ) {
+    foreach (@output) {
+      print "$_";
+    }   
+  }
+
+  foreach my $install_dir (@component_root) {
+    print STDERR "Installing component $component templates in $install_dir..\n";
+    my $comp_dir = $install_dir.'/'.$component;
+    my $add_to_svn = 0;
+    if ( !-d $comp_dir ) {
+      unless ( mkdir $comp_dir ) {
+        print STDERR "Error creating directory $comp_dir: $!\n";
+        exit 4;
+      }
+      $add_to_svn = 1;
+    }
+    my $status = system("cp $comp_source/target/pan/components/$component/*.pan $comp_dir");
+    unless ( $status == 0 ) {
+      print STDERR "Error copying templates to $comp_dir\n";
+      exit 4;
+    }
+
+    # Remove old .tpl files if any
+    if ( -e "$comp_dir/config.tpl" ) {
+      my $status = system("svn rm $comp_dir/*.tpl");
+      unless ( $status == 0 ) {
+        print STDERR "Error removing legacy .tpl files from $comp_dir\n";
+      }
+    }
+
+    if ( $add_to_svn ) {
+      my $status = system("svn add $comp_dir");
+      unless ( $status == 0 ) {
+        print STDERR "Error adding templates to SVN";
+        exit 4;
+      }
+    }
+    
+  }
+  
+}
+
+
+
+# Print the usage instructions for this script.
+sub usage {
+  my $usage_only = 1;
+  if ( (@_ == 1) && ($_[0] eq 'full') ) {
+    $usage_only = 0;
+  }
+
+  print << 'EOF'
+
+This script updates 1 or several Quattor configuration modules in SCDB from sources.
+Sources must be an up-to-date copy of Git repositories for Quattor configuration modules.
+
+Usage:  updateComponent [--comp_dir SCDB_comp_dir] \
+                        [--verbose] \
+                        [--all] \
+                        --core|--grid \
+                        --source comp_source \
+                        component [component...]
+
+EOF
+;
+
+if ( $usage_only ) {
+  print "\tFor detailed information about options, use --help.\n\n";
+
+} else {
+  print <<EOF
+    --comp_dir SCDB_comp_dir : where to install component templates. Defaults assumes
+                               the script is run from SCDB top directory and is
+                               based on --source : cfg/standard/components for core
+                               components, cfg/grid/*/components for others.
+
+    --source comp_source : directory containing all the component sources 
+                                with the same structure as in CVS (can be CVS
+                                checkout). Example : /cvs/co/ncm-components/core.
+
+    --core: core configuration module (mutually exclusive with --grid)
+    --grid: grid configurtion module (mutually exclusive with --core)
+
+    --version x: configuration module version to use (must match a git commit)
+
+    --verbose (-v) : verbose output
+    
+    --all: update all components found in the repository ('component' parameter ignored)
+
+    'component' is the name of a configuration module (without 'ncm-' prefix) to update.
+    To update several configuration modules, specify them as a space separated list.
+     
+EOF
+;
+  }
+
+  exit 1;
+}

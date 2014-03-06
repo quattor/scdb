@@ -1,0 +1,432 @@
+<project name="Quattor Management" default="all" basedir=".">
+    
+  <description>Quattor machine profile management.</description>
+
+  <!-- Checks for a quattor.deploy.properties file in the parent directory.  This is
+       mainly used to override some defaults during deployment phase (on the deployment server).
+       For backward compatibility, also look for a quattor.build.properties at the same location. -->
+  <property file="${basedir}/../quattor.deploy.properties" />
+  <property file="${basedir}/../quattor.build.properties" />
+
+  <!-- Checks for a quattor.build.properties file in the local area.  This
+       can be used to override any of the defaults given below. -->
+  <property file="${basedir}/quattor.build.properties" />
+
+  <!-- source location for support software -->
+  <property name="src" location="src" />
+  <property name="src.scripts" location="${src}/scripts" />
+
+  <!-- machine configuration location -->
+  <property name="cfg" location="cfg" />
+  <property name="clusters.directory" value="clusters" />
+  <property name="cfg.clusters" location="${cfg}/${clusters.directory}" />
+
+  <!-- To enable a hierarchical arrangement of clusters as cluster groups,
+       set clusters.groups.enable to true. --> 
+  <property name="clusters.groups.enable" value="false" />
+  <!-- To create one deployment directory per cluster group, set clusters.groups.xml to true.
+       Not that this requires an appropriate profile path in ccm configuration on managed nodes. -->
+  <property name="clusters.groups.xml" value="false" />
+  <!-- Backward compatibility (group.name was renamed cluster.group for consistency -->
+  <condition property="cluster.group" value="${group.name}">
+    <isset property="group.name" />
+  </condition>
+
+  <!-- repository location -->
+  <property name="cfg.repos" location="cfg" />
+
+  <!-- deploy subdirectories -->
+  <property name="deploy" location="deploy" />
+  <property name="deploy.xml" location="${deploy}/xml" />
+
+  <!-- build subdirectories (local to sub-ant builds) -->
+  <property name="build" location="build" />
+  <property name="build.xml" location="${build}/xml" />
+  <property name="build.log" location="${build}/log" />
+  <property name="build.timestamps" location="${build}/timestamps" />
+  <property name="build.annotations" location="${build}/annotations" />
+
+  <!-- external software -->
+  <property name="external" location="external" />
+
+  <!-- svnkit -->
+  <property name="svnkit" location="${external}/svnkit" />
+  <property name="svnkit.jar" location="${svnkit}/svnkit.jar" />
+  <property name="svnkit-javahl.jar" location="${svnkit}/svnkit-javahl.jar" />
+
+  <!-- panc (java version) -->
+  <property name="panc" location="${external}/panc" />
+  <property name="panc.jar" location="${panc}/lib/panc.jar" />
+
+  <!-- quattor utilities -->
+  <property name="quattor-utils" location="${external}/scdb-ant-utils" />
+  <property name="quattor.jar" location="${quattor-utils}/lib/quattor.jar" />
+
+  <!-- pan compiler flags -->
+  <property name="pan.debug.include" value="^$" />
+  <property name="pan.debug.exclude" value=".+" />
+  <property name="pan.formats" value="pan,dep" />
+  <property name="pan.warnings" value="on" />
+  <property name="pan.logging" value="none" />
+  <property name="pan.logfile" value="${build.log}/panc.log" />
+  <!-- To exclude repository templates, use value="repository/[\w\-\.]+$",
+       to consider them in dependency calculation, use value="" -->
+  <property name="pan.dep.ignore" value="repository/[\w\.\-]+$" />
+
+  <!-- Other debug flags for ant tasks -->
+  <property name="compile.debug.task" value="0" />
+  <property name="rep.debug.task" value="false" />
+  <property name="profile.info.debug.task" value="false" />
+  <property name="deploy.debug.task" value="false" />
+  <property name="voconfig.debug.task" value="false" />
+
+  <!-- Options for compile tasks -->
+  <!-- When compile.profiles.build.info is true, profiles-info.xml is rebuilt during compile phase.
+       Value is useless, must be undefined to be treated as false -->
+  <property name="clusters.groups.build.info" value="false" />
+  
+  <!-- format for tags in subversion repository                             -->
+  <!-- Valid characters for tags are decimal digits, '.', '-', and '/' -->
+  <!-- Use the format with slashes to limit number of tags in one directory -->
+  <property name="svn.tag.format" value="yyyy/MM/dd-HH.mm.ss" />
+
+  <!-- Options for RPM repositories management task -->
+  <!-- Create a template defining a variable listing all configured repositories -->
+  <property name="rep.templates.genList" value="false" />
+  <!-- Namespace to use for the template holding the list of all configured repositories -->
+  <property name="rep.templates.allReposTemplateNamespace" value="repository/allrepositories" />
+  <!-- rep.templates.allReposTemplate must be defined to the relative directory
+       where rep.templates.allReposTemplateName must be created (parent of namespace relative to cfg.repos) -->
+  <property name="rep.templates.allReposTemplateDir" value="" />
+  
+  <!-- Variables specific to update.vo.config target -->
+  <property name="voConfigRootDir" value="${cfg}/grid"/>
+  <property name="voConfigIncludes" value="glite-*"/>
+  <property name="voConfigCertsNS" value="vo/certs"/>
+  <property name="voConfigParamsNS" value="vo/params"/>
+  <property name="voConfigSiteParamsNS" value="vo/site"/>
+  <property name="voConfigUri"
+            value="http://operations-portal.egi.eu/xml/voIDCard/public/all/true"/>
+  <property name="voConfigDefaultServices" value="vo/site/defaultservices"/>
+
+  <!--                                                               -->
+  <!-- INTERNAL TARGET: Initialization                               -->
+  <!--                                                               -->
+  <target name="init">
+
+    <!-- Create the time stamp -->
+    <tstamp />
+
+    <!-- Make the build subdirectories. -->
+    <mkdir dir="${build.xml}" />
+    <mkdir dir="${build.annotations}" />
+    <mkdir dir="${build.timestamps}" />
+    <mkdir dir="${build.log}" />
+
+  </target>
+
+
+  <!--                                                               -->
+  <!-- Clean up generated files.                                     -->
+  <!--                                                               -->
+  <target name="clean" description="Clean up generated files">
+
+    <!-- Delete everything in the build directory. -->
+    <delete includeEmptyDirs="true" dir="${build}" />
+
+    <!-- Clean up object files in source directory. -->
+    <delete>
+      <fileset dir="${cfg}" includes="**/*.obj" />
+    </delete>
+
+  </target>
+
+
+  <!--                                                               -->
+  <!-- Clean up generated and deployed files.                        -->
+  <!--                                                               -->
+  <target name="clean.all" depends="clean" description="Clean up generated files and deployment area">
+
+    <!-- Delete everything in the deploy directory. -->
+    <delete includeEmptyDirs="true" dir="${deploy}" />
+
+  </target>
+
+
+  <!--                                                               -->
+  <!-- INTERNAL TARGET: define custom ant tasks                      -->
+  <!--                                                               -->
+  <target name="define.tasks" depends="init">
+
+    <!-- define SCDB tasks -->
+    <taskdef resource="org/quattor/ant/quattor-ant.xml">
+      <classpath>
+        <pathelement path="${quattor.jar}" />
+        <pathelement path="${svnkit.jar}" />
+        <pathelement path="${svnkit-javahl.jar}" />
+      </classpath>
+    </taskdef>
+
+    <!-- define the task for the java-based pan compiler -->
+    <taskdef resource="org/quattor/ant/panc-ant.xml">
+      <classpath>
+        <pathelement path="${panc.jar}" />
+      </classpath>
+    </taskdef>
+
+  </target>
+
+
+  <!--                                                               -->
+  <!-- Generate repository templates from web server.                -->
+  <!--                                                               -->
+  <target name="update.rep.templates" depends="init,define.tasks" description="Update repository templates from web">
+
+    <repository-templates debugTask="${rep.debug.task}" genList="${rep.templates.genList}"
+                          nameListDir="${cfg.repos}/${rep.templates.allReposTemplateDir}"
+                          listName="${rep.templates.allReposTemplateNamespace}">
+      <fileset dir="${cfg.repos}">
+          <include name="**/repository/*.pan" />
+          <include name="**/repository/*.tpl" />
+      </fileset>
+    </repository-templates>
+
+  </target>
+
+
+  <!--                                                               -->
+  <!-- Check pan template syntax                                     -->
+  <!--                                                               -->
+  <target name="check.syntax" depends="init,define.tasks" description="Check syntax of pan templates">
+
+    <!-- Syntax check only!  Don't build any machine configurations or write object files. -->
+    <panc warnings="${pan.warnings}" formats="none" verbose="true">
+
+      <!-- Only select files newer than the timestamp file. -->
+      <fileset dir="${cfg}">
+        <depend targetdir="${build.timestamps}">
+          <mapper type="merge" to="check.syntax" />
+        </depend>
+      </fileset>
+    </panc>
+
+    <!-- Update timestamp for the syntax check. -->
+    <touch file="${build.timestamps}/check.syntax" verbose="false" />
+
+  </target>
+
+
+  <!--                                                               -->
+  <!-- Compile annotations                                           -->
+  <!--                                                               -->
+  <target name="compile.annotations" depends="init,define.tasks" description="Compile annotations from existing templates">
+
+    <!-- Compile annotations only!  Don't build any machine configurations or write object files. -->
+    <panc warnings="${pan.warnings}" formats="none" 
+          annotationDirectory="${build.annotations}" verbose="true">
+
+      <!-- Only select files newer than the timestamp file. -->
+      <fileset dir="${cfg}">
+        <depend targetdir="${build.timestamps}">
+          <mapper type="merge" to="compile.annotations" />
+        </depend>
+      </fileset>
+    </panc>
+
+    <!-- Update timestamp for the annotation compilation. -->
+    <touch file="${build.timestamps}/compile.annotations" verbose="false" />
+
+  </target>
+
+
+  <!--                                                               -->
+  <!-- Compile all machine profiles                                  -->
+  <!--                                                               -->
+  <target name="compile.profiles" depends="init,define.tasks,check.syntax" description="Compile machine XML profiles">
+    <property name="quattorbasedir" value="${basedir}" />
+
+    <!-- When cluster groups are enabled, execute compile.cluster.groups for each groups.
+         Else call it once with an empty group name. -->
+    <condition property="clusters.groups.pattern" value="${clusters.directory}/*" else="${clusters.directory}">
+      <istrue value="${clusters.groups.enable}" />
+    </condition>
+    
+    <subant target="compile.cluster.groups" genericantfile="${basedir}/build.xml" inheritall="true">
+      <dirset dir="${cfg}">
+        <include name="${clusters.directory}/${cluster.group}" if="cluster.group"/>
+        <include name="${clusters.groups.pattern}" unless="cluster.group"/>
+      </dirset>
+    </subant>
+
+  </target>
+
+
+  <!--                                                                          -->
+  <!-- INTERNAL TARGET: MUST NOT BE CALLED DIRECTLY                             -->
+  <!-- Target compile.cluster.groups processes each group of clusters, if any    -->
+  <!-- Target compile.cluster.profiles compiles each profile in a given cluster -->
+  <!--                                                                          -->
+  
+  <target name="compile.cluster.groups"> 
+
+    <basename property="groupnametmp" file="${basedir}"/>
+    <condition property="groupname" value="${groupnametmp}" else="" >
+      <istrue value="${clusters.groups.enable}" />
+    </condition>
+    <condition property="groupnamemsg" value="group ${groupname}" else="default group">
+      <istrue value="${clusters.groups.enable}" />
+    </condition>
+    <echo message="Compiling profiles for ${groupnamemsg}" />
+
+    
+    <condition property="outputdir" value="${build.xml}/${groupname}" else="${build.xml}">
+      <and>
+        <istrue value="${clusters.groups.enable}" />
+        <istrue value="${clusters.groups.xml}" />
+      </and>
+    </condition>
+
+    <mkdir dir="${outputdir}" />
+
+    <subant target="compile.cluster.profiles"
+            genericantfile="${quattorbasedir}/build.xml"
+            inheritall="true">
+      <dirset dir="${basedir}"  >
+        <include name="${cluster.name}" if="cluster.name" />
+        <include name="*" unless="cluster.name" />
+      </dirset>
+    </subant>
+
+    <!-- Update profiles-info.xml if requested: this must be done as part of the cluster group
+         compilation as there is one profile directory per cluster group.
+         Disable informational message as the ant output is messed up
+         because of the subant executed before (enable debug if needed). -->
+    <condition property="profiles.info.outputdir" value="${outputdir}" else="">
+      <istrue value="${clusters.groups.build.info}" />
+    </condition>
+    <pan-profile-info profilesDirName="${profiles.info.outputdir}" debugTask="${profile.info.debug.task}" verbose="false" />
+  </target>
+
+
+  <target name="compile.cluster.profiles">
+
+    <basename property="cluster.current" file="${basedir}" />
+    <condition property="cluster.location" value="${cfg.clusters}/${groupname}" else="${cfg.clusters}">
+      <istrue value="${clusters.groups.enable}" />
+    </condition>
+    <echo message="Cluster: ${cluster.current} in ${cluster.location}" />
+
+    <!-- Allow a cluster to set properties for the build.
+         One required property to set is "cluster.pan.includes" which contains a space- or comma-
+         separated list of directory globs.
+         This can be set on a per-cluster basis or for all clusters in the group.  
+         If cluster groups are not used, this is harmless. If a properly is defined both in
+         the cluster group and in the cluster, cluster takes precedence.  -->
+    <property file="${cluster.location}/${cluster.current}/cluster.build.properties" />
+    <property file="${cluster.location}/cluster.group.build.properties" />
+
+    <property name="cluster.include" value="${cluster.location}"/>
+    <!-- Define the load path.  By default this is just the cluster area. -->
+    <path id="pan.loadpath">
+      <dirset dir="${cluster.include}"
+              includes="${cluster.current} ${cluster.current}/profiles ${cluster.current}/site" />
+    </path>
+
+    <panc verbose="true" warnings="off" checkDependencies="true"
+          maxIteration="5000" debugTask="${compile.debug.task}" formats="pan,dep"
+          outputDir="${outputdir}" includeroot="${cfg}" includes="${cluster.pan.includes}"
+          logging="${pan.logging}"
+          logfile="${pan.logfile}" ignoreDependencyPattern="${pan.dep.ignore}"
+    	  debugNsInclude="${pan.debug.include}" debugNsExclude="${pan.debug.exclude}">
+
+      <!-- The load path and profiles to compile. -->
+      <path refid="pan.loadpath" />
+      <fileset dir="${basedir}/profiles" casesensitive="yes">
+          <include name="**/*.pan" />
+          <include name="**/*.tpl" />
+      </fileset>
+
+    </panc>
+
+  </target>
+
+  
+  <!--                                                               -->
+  <!-- Tag and deploy a release.                                     -->
+  <!--                                                               -->
+  <target name="deploy" depends="compile.profiles" description="Deploy (tag release)">
+
+    <fail message="Property 'cluster.name' is invalid with deploy" if="cluster.name" />
+
+    <fail message="Property 'cluster.group' is invalid with deploy" if="cluster.group" />
+
+    <tstamp>
+      <format property="svn.tag.name" pattern="${svn.tag.format}" timezone="GMT" />
+    </tstamp>
+
+    <quattor-svntag tag="${svn.tag.name}" workspacepath="${basedir}" debugTask="${deploy.debug.task}" />
+
+  </target>
+
+
+  <!--                                                               -->
+  <!-- INTERNAL TARGET: Deploy new profiles and notify clients.      -->
+  <!--                                                               -->
+  <target name="deploy.and.notify" depends="compile.profiles,define.tasks">
+
+    <!-- Clear out all old profiles.  Remake the deploy directory. -->
+    <delete includeEmptyDirs="true" dir="${deploy.xml}" />
+    <mkdir dir="${deploy.xml}" />
+
+    <!-- Copy all of the generated profiles. -->
+    <copy todir="${deploy.xml}">
+      <fileset dir="${build.xml}">
+        <include name="**/*" />
+      </fileset>
+    </copy>
+
+    <!-- Update profiles-info.xml -->
+    <pan-profile-info profilesDirName="${deploy.xml}" debugTask="${profile.info.debug.task}" />
+
+    <!-- Notify all of the quattor client machines. -->
+    <quattor-notify message="ccm" port="7777">
+      <fileset dir="${build.xml}">
+      	<include name="**/*"/>
+        <exclude name="**/profile-info.xml" />
+      </fileset>
+    </quattor-notify>
+
+  </target>
+
+
+  <!--                                                               -->
+  <!-- DEFAULT TARGET: Build all of the machine profiles.            -->
+  <!--                                                               -->
+  <target name="all" depends="compile.profiles" description="Create profiles" />
+
+
+  <!--                                                               -->
+  <!-- Build all of the machine profiles from scratch.               -->
+  <!--                                                               -->
+  <target name="all.force" depends="clean,all" description="Create profiles from scratch" />
+
+
+  <!-- Update VO parameters from CIC portal -->
+  <target name="update.vo.config" depends="init,define.tasks" description="Update vo templates from web">
+
+    <echo message="Updating VO parameters in ${voConfigRootDir}/${voConfigIncludes}"/>
+      
+    <quattor-voconfig paramsTplNS="${voConfigParamsNS}" certsTplNS="${voConfigCertsNS}"
+                      siteParamsTplNS="${voConfigSiteParamsNS}"
+                      voIdCardsUri="${voConfigUri}"
+                      debugTask="${voconfig.debug.task}"
+                      >
+      <dirset dir="${voConfigRootDir}">
+        <include name="${voConfigIncludes}"/>
+      </dirset>
+    </quattor-voconfig>
+
+  </target>
+
+
+</project>

@@ -1,0 +1,123 @@
+#!/bin/bash
+#
+# Brute force script to update a directory managed by SVN from another
+# source. This is done by deleting all .tpl files from the directory and
+# copying from the source. The result can be analyzed with SVN status
+# for final cleanup.
+#
+# It is always possible to use 'svn revert' in case of error...
+#
+# To process a directory tree (e.g. os/sl430-x86-64 when you are at top
+# level and if your production SCDB is in ../cdb), use a find command like :
+#   find os/sl430-x86_64 -type d -not -path '*.svn*' -exec \
+#                                   tools/directory-sync {} ../cdb/cfg \;
+#
+# If your source directory root (last parameter) contains spaces, be sure that
+# they are properly escaped with \.
+#
+# Written by Michel Jouvin - jouvin@lal.in2p3.fr - 18/7/06
+
+
+usage () {
+  echo "Usage:\t$(basename $0) dest_directory src_directory_root"
+  exit 1
+}
+
+
+if [ -z "$1" -o -z "$2" ]
+then
+  usage
+fi
+
+dest_dir=$1
+src_root=$2
+src_dir=$src_root/$dest_dir
+
+if [ ! -d "$dest_dir" ]
+then
+  echo "Error : destination directory $dest_dir doesn't exist"
+  exit 2
+fi
+
+if [ ! -d "${src_root}" ]
+then
+  echo "Error : source directory root $src_root doesn't exist"
+  exit 3
+fi
+
+# Check it is a SVN workspace
+$(svn info "$dest_dir" > /dev/null 2>&1)
+if [ $? -ne 0 ]
+then
+  echo "Error : destination directory $dest_dir is not a SVN workspace"
+  exit 4
+fi
+
+show_svn_diff=0
+
+# If $src_dir doesn't exist (but src_root exists), assume it has been
+# removed and delete from $dest_dir.
+
+if [ ! -d "$src_dir" ]
+then
+    echo "Removing $dest_dir"
+    svn rm -q "$dest_dir"
+
+
+else
+  # Remove existing files from dest dir (can be recovered by svn revert)
+  dest_files=$(find "$dest_dir" -mindepth 1 -maxdepth 1 -not -regex '.*.svn/.*' -not -type d)
+  if [ -n "$dest_files" ]
+  then
+    echo "Cleaning $dest_dir"
+    show_svn_diff=1
+    rm -f $dest_files
+  fi
+
+  # Copy existing files from source directory
+  # Use find command twice to properly handle spaces in $src_dir
+  src_files=$(find "$src_dir" -mindepth 1 -maxdepth 1 -not -regex '.*.svn/.*' -not -path '.git' -not -type d)
+  if [ -n "$src_files" ]
+  then
+    echo "Updating $dest_dir from $src_dir"
+    show_svn_diff=1
+    find "$src_dir" -mindepth 1 -maxdepth 1 -not -regex '.*.svn/.*' -not -path '.git' -not -type d -exec cp {} "$dest_dir" \;
+  fi
+
+  # Copy directories in source dir not existing in destination directory
+  # and add to SVN. A special trick is used to allow spaces in directory name.
+  subdirs=$(find "$src_dir" -maxdepth 1 -mindepth 1 -type d -not -name .svn -not -name .git)
+  #echo subdirs = $subdirs
+  if [ -n "$subdirs" ]
+  then
+    num_subdirs=$(echo "$subdirs" | awk -F'\n' -v RS='' '{print NF}')
+  else
+    num_subdirs=0
+  fi
+  #echo num_sbdirs = $num_subdirs
+  for ((i=1; $i<=$num_subdirs; i++))
+  do
+    dir=$(echo "$subdirs" | awk -F'\n' -v RS='' "{print \$$i}")
+    dest_subdir=${dest_dir}/$(basename "$dir")
+    src_subdir="$dir"
+    #echo Checking $subdir (i=$i)
+    if [ ! -d "$dest_subdir" ]
+    then
+      echo "Creating $dest_subdir"
+      cp -R "$src_subdir" "$dest_dir"
+      find "$dest_subdir" -name .svn -type d -exec rm -Rf {} \;  2>/dev/null
+      echo "Adding $dest_subdir to SVN"
+      svn add -q "$dest_subdir" 
+    fi
+  done
+
+fi
+
+# Show differences
+if [ $show_svn_diff -ne 0 ]
+then
+  echo "Differences (SVN)"
+  svn status "$dest_dir"
+fi
+
+

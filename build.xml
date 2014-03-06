@@ -1,0 +1,23 @@
+<project name="GRIF Cluster Management" default="all" basedir=".">
+          
+  <description>
+    Tasks for configuring and maintaining the GRIF Tier 2 facility.
+  </description>
+  
+<!-- **************************************************************************
+     Import the standard tasks from the quattor build.xml file.  Tasks defined
+     there may be overridden or extended in this file.  
+     
+     NOTE:  The standard quattor build file looks for a file
+     called quattor.build.properties relative to the basedir property.  
+     Properties may be overridden by creating and populating such a file. 
+ ************************************************************************** -->
+  <import file="quattor.build.xml"/>
+
+<!-- **************************************************************************
+     Define the "local.tasks" property in the quattor.build.properties file
+     to import a file containing local tasks.   
+ ************************************************************************** -->
+  <import file="${local.tasks}" optional="true"/>
+
+</project>

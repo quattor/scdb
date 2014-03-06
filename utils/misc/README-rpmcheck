@@ -1,0 +1,25 @@
+
+**** Copyright (c) 2004 by Charles A. Loomis, Jr. and Le Centre National de
+**** la Recherche Scientifique (CNRS).  All rights reserved.
+****
+**** The software was distributed with and is covered by the European
+**** DataGrid License.  A copy of this license can be found in the included
+**** LICENSE file.  This license can also be obtained from
+**** http://www.eu-datagrid.org/license.
+
+This software is intended to check that the rpm list in a generated
+LLD file is complete.  The script does this by extracting the full
+list of rpms and then doing a fake install of those rpms.  Any
+warnings or errors are written to stderr.  
+
+The typical processing goes like:
+
+./rpmcheck.pl --saxon=saxon7.jar \
+              /var/lib/cdb/lld/xml/profile_localhost.xml
+
+If any errors occur, then the list is not valid.  The rpm errors are
+usually explicit enough to determine where the problem lies. 
+
+NOTE: The transformation uses features from XSLT 2.0.  Saxon
+implements this and was used for testing.  The Saxon code (v7+) can be
+obtained from: http://saxon.sourceforge.net/.

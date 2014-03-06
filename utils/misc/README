@@ -1,0 +1,27 @@
+
+quattor-sw-util: a collection of Perl utilities for generating Pan templates
+describing the RPM packages to be managed by Quattor.
+
+Author: 
+	Charles A. Loomis, Jr. -> comps2pan, html2pan, html2updates and rpmcheck
+	Marco Emilio Poleggi <Marco.Poleggi@cern.ch> -> rpmq2pan_pkg
+
+###############################################################################
+comps2pan:
+	transform a comps.xml file (used to describe package groups for RedHat-like
+	systems) into a set of PAN templates suitable for use with quattor.
+
+html2pan:
+	generate valid repository PAN templates from an rpm repository which 
+	already exists in an HTTP server.
+
+html2updates:
+	similar to html2pan, but create a list of "updates".
+
+rpmcheck:
+	check that the rpm list in a generated LLD file is complete.
+
+rpmq2pan_pkg:
+	generate Pan software package templates from the local RPM database 
+	contents.
+

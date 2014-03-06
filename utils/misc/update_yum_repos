@@ -1,0 +1,99 @@
+#!/bin/bash
+#
+# This script updates the metadata of all RPM repositories found under a root
+# directory. A directory is considered a RPM repository if it contains RPM files.
+# If the RPM repository is not yet configured as a YUM repository, metadata will
+# be created.
+#
+# Written by Michel Jouvin - LAL/CNRS - 8/10/2009
+
+# Possible RPM group file name, relative to the directory containing the RPMs
+group_file_list="../base/comps.xml repodata/comps-sl.xml"
+
+force_update=0
+
+usage () {
+  echo "Usage:   $(basename $0) [--force] repos_parent..."
+  exit 1
+}
+
+while [ -n "$(echo $1 |grep '^-')" ]
+do
+  case $1 in
+    -h|--help)
+         usage
+         ;;
+
+    --force)
+        force_update=1
+        ;;
+
+    *)
+         echo "Unsupported option ($1)"
+         usage
+         ;;
+  esac
+  shift
+done
+
+if [ -z "$1" ]
+then
+  echo "You need to specify parent directory of YUM repositories"
+  usage
+fi
+
+createrepo_opts='--update --database'
+if [ ${force_update} -eq 0 ]
+then
+  createrepo_opts="${createrepo_opts} --checkts"
+fi
+
+trap "echo 'Update interrupted by CTRL/C';exit 2" INT
+
+for repos_parent in $*
+do
+  if [ ! -d ${repos_parent} ]
+  then
+    echo "Error: ${repos_parent} is not a valid repository parent"
+    continue
+  fi
+  repos_dirs=$(find ${repos_parent} -type d)
+  
+  for dir in $repos_dirs
+  do
+    if [ -z "$(ls ${dir}/*-*.*.rpm 2>/dev/null)" ]
+    then
+      #echo "$dir doesn't contain RPM files. Ignoring..."
+      continue
+    fi
+    echo "Updating YUM metadata in $dir..."
+    
+    # Check if there is a RPM group file in one of the usual locations.
+    # This should happen only for OS repositories where these files are located in
+    # one of the following location:
+    #    - SL4: ../base/comps.xml
+    #    - SL5: repodata/comps-sl.xml
+    # Note that there is no easy way to tell a repository is for OS distribution, so
+    # the check is done for every repository.
+    
+    rpm_group_file=''
+    for group_file in ${group_file_list}
+    do
+      if [ -f ${dir}/${group_file} ]
+      then
+        rpm_group_file="-g ${dir}/${group_file}"
+        echo "Detected RPM group file. Configuring createrepo to use it (${rpm_group_file})..."
+        break
+      fi
+    done
+    
+    log_file=/tmp/$(basename $0)$(echo $dir|sed -e 's%/%_%g').err
+    createrepo ${createrepo_opts} ${rpm_group_file} ${dir} >/dev/null 2> ${log_file}
+    if [ $? -ne 0 -o -s ${log_file} ]
+    then
+      echo "Failed to update YUM metadata in $dir (see ${log_file} for details"
+    else
+      rm -f ${log_file}
+    fi
+  done
+done

@@ -1,0 +1,100 @@
+
+**** Copyright (c) 2004 by Charles A. Loomis, Jr. and Le Centre National de
+**** la Recherche Scientifique (CNRS).  All rights reserved.
+****
+**** The software was distributed with and is covered by the European
+**** DataGrid License.  A copy of this license can be found in the included
+**** LICENSE file.  This license can also be obtained from
+**** http://www.eu-datagrid.org/license.
+
+This software is intended to transform a comps.xml file (used to
+describe package groups for RedHat-like systems) into a set of PAN
+templates suitable for use with quattor.  The transformation
+faithfully preserves the group structure of the source comps.xml file.
+
+Prerequisites:
+
+1) The source comps.xml file for your RedHat-like distribution.  The
+most reliable place to get the file is from the ISO image of the first
+installation disk.  Mount the image and look in the directory:
+distname/base where distname is the name of the distribution.  For
+Fedora this is "Fedora/base" and for Scientific Linux, "SL/base".
+
+NOTE: You must edit the comps.xml file and delete the DOCTYPE tag.
+Most XML parsers will try to validate the file against the DTD and
+will fail if it isn't available. 
+
+2) All of the RPMs of the distribution must be locally accessible.
+Either mount the ISO images of the installation disks or copy the full
+set of RPMs from a mirror.
+
+3) An XSLT processor compliant with XSLT 2.0!  The transform has been
+tested with the Saxon processor; use version 8.5 or later.  It can be
+downloaded from: http://saxon.sourceforge.net/.
+
+4) The Saxon processor is written in Java and requires a Java Virtual
+Machine.  Install a real commercial JVM which supports Java 1.4 or
+later.  The GJC (GNU Java) will not work!  You can tell which java you
+have by running "java -version" from the command line.
+
+5) Perl.  Scripts are written in perl; you won't get far without it. 
+
+Template Generation:
+
+1) Extract the "provides" information from the distribution's RPMs.
+The command for doing this is:
+
+./rpmProvides.pl \
+    /mnt/fc1/Fedora/RPMS/ \
+    /mnt/fc2/Fedora/RPMS/ \
+    /mnt/fc3/Fedora/RPMS/ \
+    /home/loomis/fedora/updates/ > rpm-provides-fc1.txt
+
+The arguments are the list of directories containing the
+distribution's RPMs.  If you have updates to the standard packages,
+put them in a separate directory and put it LAST on the command line.
+Redirect the output to a file. 
+
+2) Extract the "requires" information from the RPMs and from the
+"provides" information of the above step.  The command for doing this
+is: 
+
+./rpmRequires.pl \
+    rpm-provides-fc1.txt \
+    /mnt/fc1/Fedora/RPMS/ \
+    /mnt/fc2/Fedora/RPMS/ \
+    /mnt/fc3/Fedora/RPMS/ \
+    /home/loomis/fedora/updates/ > rpm-requires-fc1.txt
+
+The first argument is the name of the file with the provides
+information.  Follow this with the same list of directories containing
+the RPMs.  Redirect the output to a file. 
+
+3) Transform the comps.xml file into a set of pan templates.  
+
+export CLASSPATH=<full path to saxon jar file>
+java net.sf.saxon.Transform \
+    comps.xml \
+    comps2pan.xsl \
+    depdb=rpm-requires-fc1.txt \
+    output-dir=`pwd` \
+    pan-prefix=pro_fc1_
+
+The CLASSPATH must be set to the full path of the Saxon jar file.  The
+first two arguments of the transform are the comps.xml file and the
+transformation stylesheet.  Replace the value of the depdb option with
+the file you produced in step 2.  Define output-dir to be the existing
+directory where you want to write the generated pan templates.  (This
+is used in an URL, so use must use '/' as the directory separator for
+all platforms.)  Set the pan-prefix to the desired prefix for the pan
+templates.  This is typically "pro_<distname>_" if you don't use
+namespaces and the empty string if you do.
+
+4) Verify that the syntax of the generated files are correct. 
+
+panc --check `find <output-dir> *.tpl`
+
+where <output-dir> is replaced with the output directory you used
+above.  Typically you'll need to fix by hand some of the global
+variables which have been generated for the kernel and kernel modules.
+ 
