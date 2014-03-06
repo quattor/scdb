@@ -196,7 +196,7 @@ sub usage {
 This script updates 1 or several Quattor configuration modules in SCDB from sources.
 Sources must be an up-to-date copy of Git repositories for Quattor configuration modules.
 
-Usage:  updateComponent [--comp_dir SCDB_comp_dir] \
+Usage:  updateComponent [--comp-dir SCDB_comp_dir] \
                         [--verbose] \
                         [--all] \
                         --core|--grid \
@@ -211,7 +211,7 @@ if ( $usage_only ) {
 
 } else {
   print <<EOF
-    --comp_dir SCDB_comp_dir : where to install component templates. Defaults assumes
+    --comp-dir SCDB_comp_dir : where to install component templates. Defaults assumes
                                the script is run from SCDB top directory and is
                                based on --source : cfg/standard/components for core
                                components, cfg/grid/*/components for others.

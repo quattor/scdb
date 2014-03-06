@@ -1,0 +1,191 @@
+#!/usr/bin/perl
+#
+# Script to update  AII templates in QWG templates
+# from the version in Quattor Git repository.
+#
+# Written by Michel Jouvin - LAL / CNRS - <jouvin@lal.in2p3.fr>
+
+use strict;
+use File::Basename;
+use Getopt::Long;
+
+my $aii_root;
+my $source;
+my $version;
+my $verbose = 0;
+my @comp_list = ("core", "dhcp", "ks", "pxelinux");
+
+# Process the script arguments
+
+my %options = ();
+&GetOptions(\%options, "all",
+                       "aii-dir=s", 
+                       "help",
+                       "source=s", 
+                       "version=s",
+                       "verbose+") or usage();
+
+if ( defined($options{help}) ) {
+  usage('full');
+}
+
+if ( defined($options{verbose}) ) {
+  $verbose = $options{verbose};
+}
+
+if ( defined($options{version}) ) {
+  $version = $options{version};
+}
+
+unless ( defined($options{source}) ) {
+  print STDERR "Error: no source specified for components\n";
+  usage();
+}
+
+$source = $options{source};
+$source =~ s%/$%%;
+if ( !-d $source ) {
+  print STDERR "Error : AII source ($source) doesn't exist\n";
+  exit 2;
+}
+
+if ( defined($options{'aii-dir'}) ) {
+  $aii_root = $options{'aii-dir'};
+} else {
+  $aii_root = 'cfg/standard/quattor/aii';
+}
+unless ( -d $aii_root ) {
+  print STDERR "Error: installation directory for templates ($aii_root) doesn't exist\n";
+  exit 3;
+}
+
+if ( $verbose ) {
+  print "\n";
+  print "Component source = $source\n";
+  print "Installation directory for templates = $aii_root\n";
+  print "Verbosity level = $verbose\n";
+}
+
+
+# Rebuild and install each component
+
+print STDERR "\nBuilding AII components...\n";
+my @output;
+if ( $version ) {
+  @output = qx%cd $source; git checkout $version 2>&1%;
+  unless ( $? == 0 ) {
+    print STDERR "Error switching to version $version\n";
+    foreach (@output) {
+      print "$_";
+    }   
+    exit 6;
+  }
+}
+@output = qx%cd $source; export PERL5LIB=; mvn clean package 2>&1%;
+unless ( $? == 0 ) {
+  print STDERR "Error rebuilding component\n";
+  exit 6;
+}
+if ( $verbose > 1 ) {
+  foreach (@output) {
+    print "$_";
+  }   
+}
+
+foreach my $aii_comp (@comp_list) {
+  my $install_root;
+  my @template_subdirs;
+  if ( $aii_comp eq "core" ) {
+    $install_root = $aii_root;
+    push @template_subdirs, '';
+  } else {
+    $install_root = "$aii_root/$aii_comp";
+    push @template_subdirs, $aii_comp;
+    if ( $aii_comp eq "ks" ) {
+      push @template_subdirs, "$aii_comp/variants";
+    }
+  }
+
+  foreach my $subdir (@template_subdirs) {
+    my $install_subdir = $subdir;
+    $install_subdir =~ s/^$aii_comp//;
+    my $install_dir = $install_root . $install_subdir;
+    print STDERR "Installing aii-$aii_comp templates in $install_dir..\n";
+    my $add_to_svn = 0;
+    if ( !-d $install_dir ) {
+      unless ( mkdir $install_dir ) {
+        print STDERR "Error creating directory $install_dir: $!\n";
+        exit 4;
+      }
+      $add_to_svn = 1;
+    }
+    my $status = system("cp $source/aii-$aii_comp/target/pan/quattor/aii/$subdir/*.pan $install_dir");
+    unless ( $status == 0 ) {
+      print STDERR "Error copying templates to $install_dir\n";
+      exit 4;
+    }
+  
+    # Remove old .tpl files if any
+    if ( -e "$install_dir/config.tpl" ) {
+      my $status = system("svn rm $install_dir/*.tpl");
+      unless ( $status == 0 ) {
+        print STDERR "Error removing legacy .tpl files from $install_dir\n";
+      }
+    }
+
+    if ( $add_to_svn ) {
+      my $status = system("svn add $install_dir");
+      unless ( $status == 0 ) {
+        print STDERR "Error adding templates to SVN";
+        exit 4;
+      }
+    }
+  }
+  
+}
+  
+
+
+
+# Print the usage instructions for this script.
+sub usage {
+  my $usage_only = 1;
+  if ( (@_ == 1) && ($_[0] eq 'full') ) {
+    $usage_only = 0;
+  }
+
+  print << 'EOF'
+
+This script updates AII templates in SCDB from sources.
+Sources must be an up-to-date copy of Git repositories for Quattor configuration modules.
+
+Usage:  updateComponent [--aii-dir SCDB_aii_dir] \
+                        [--verbose] \
+                        [--version x] \
+                        --source comp_source \
+                        component [component...]
+
+EOF
+;
+
+if ( $usage_only ) {
+  print "\tFor detailed information about options, use --help.\n\n";
+
+} else {
+  print <<EOF
+    --aii-dir SCDB_aii_dir : where to install AII templates. Defaults assumes
+                               the script is run from SCDB top directory and will
+                               install templates under cfg/standard/quattor/aii.
+
+    --source comp_source : directory containing AII sources.
+
+    --version x: configuration module version to use (must match a git commit)
+
+    --verbose (-v) : verbose output
+    
+EOF
+;
+  }
+
+  exit 1;
+}
