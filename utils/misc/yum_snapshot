@@ -1,0 +1,205 @@
+#!/bin/bash
+#
+# Script to snapshot a repository. The snapshot is created at the location indicated by variable snapshot_root_dir 
+# by creating a directory with the current date and  adding one directory matching the original repository name. 
+# The snapshop is  made by creating a hard link for each RPM found in the
+# original repository. The original repository and the snapshot must be in the same filesystem.
+#
+# Written by Michel Jouvin - CNRS LAL - 18/2/2014
+
+snapshot_root_dir=/www/htdocs/packages/yum/snapshots
+update_snapshot=0
+verbose=0
+quattor_yum_script_dir=$(dirname $0)
+snapshot_name=
+previous_snapshot=
+
+usage () {
+  echo "Usage:    $(basename $0) [--snapshot-dir /path/to/snapshot] [--update] [--previous snapshot] [--verbose] --snapshot-name snap_name repository_path"
+  exit 1
+}
+
+make_hlink () {
+  if [ -z "$1" ]
+  then
+    echo "Internal error: RPM list empty"
+    exit 10
+  fi
+
+  if [ -z "$2" ]
+  then
+    echo "Internal error: YUM snapshot directory missing"
+    exit 10
+  fi
+
+  local dest_dir=$2
+  if [ ! -d ${dest_dir} ]
+  then
+    mkdir -p ${dest_dir}
+  fi
+  
+  for src_rpm in $1
+  do
+    rpm_name=$(basename $src_rpm)
+    if [ ! -e ${dest_dir}/${rpm_name} ]
+    then
+      [ ${verbose} -eq 1 ] && echo "    Adding ${rpm_name} to snapshot"
+      ln ${src_rpm} ${dest_dir}
+    fi
+  done
+}
+
+process_directory () {
+  if [ -z "$1" ]
+  then
+    echo "Internal error: source directory missing in process_directory()"
+    exit 11
+  fi
+
+  if [ -z "$2" ]
+  then
+    echo "Internal error: destination directory missing in process_directory()"
+    exit 11
+  fi
+
+  if [ -n "$3" -a "$3" = "all" ]
+  then
+    excluded_dirs=
+  else
+    excluded_dirs="-not -name 'repodata'"
+  fi
+
+  local src_dir="$1/"      # Add a trailing / to ensure correct processing of symlinks
+  local dest_dir="$2"
+
+  [ ${verbose} -eq 1 ] && echo "    Processing directory ${src_dir}..."
+  subdirs=$(find ${src_dir} -maxdepth 1 -type d -not -name '.*' ${excluded_dirs} -printf '%P ')
+  for subdir in ${subdirs}
+  do
+    process_directory ${src_dir}${subdir} ${dest_dir}/${subdir}
+  done
+
+  files=$(find ${src_dir} -maxdepth 1 -type f)
+  if [ -n "$files" ]
+  then
+    make_hlink "$files" ${dest_dir}
+  fi
+}
+
+
+while [ -n "$(echo $1 |grep '^-')" ]
+do
+  case $1 in
+    -h|--help)
+         usage
+         ;;
+
+    --previous)
+        shift
+        previous_snapshot=$1
+        ;;
+
+    --snapshot-dir)
+        shift
+        snapshot_root_dir=$1
+        ;;
+
+    --snapshot-name)
+        shift
+        snapshot_name=$1
+        ;;
+
+    --update)
+       update_snapshot=1
+       ;;
+
+    --verbose)
+       verbose=1
+       ;;
+
+    *)
+         echo "Unsupported option ($1)"
+         usage
+         ;;
+  esac
+  shift
+done
+
+if [ -z "$1" ]
+then
+  echo "You need to specify the path of the repository you want to snapshot"
+  usage
+fi
+
+if [ -z "${snapshot_root_dir}" ]
+then
+  echo "Invalid parent directory for snapshots (--snapshot_root_dir)"
+  usage
+fi
+
+if [ -z "${snapshot_name}" ]
+then
+  echo "You must specify snapshot repository name with option --snapshot-name"
+  usage
+fi
+
+src_repo_path=$1
+repo_name="$(basename ${src_repo_path})"
+current_snapshot_dir="${snapshot_root_dir}/$(date +%Y%m%d)"
+snapshot_dir="${current_snapshot_dir}/${snapshot_name}"
+
+src_repo_fs=$(df ${src_repo_path} | head -2 | awk '{print $1}' | tail -1)
+snapshot_fs=$(df ${snapshot_root_dir} | head -2 | awk '{print $1}' | tail -1)
+
+echo -n "Checking that source repository and snapshot are in the same filesystem... "
+if [ ${snapshot_fs} = ${src_repo_fs} ]
+then
+   echo "Ok"
+else
+   echo " Failed"
+   exit 2
+fi
+
+if [ -d ${snapshot_dir} ]
+then
+  if [ ${update_snapshot} -eq 1 ]
+  then
+    if [ -n "${previous_snapshot}" ]
+    then
+      echo "Snapshot already exists for YUM repository ${repo_name} (${src_repo_path}): ignoring previous snapshot"
+    fi
+    echo "Updating snapshot ${snapshot_name} of YUM repository ${repo_name} (${src_repo_path}) in ${snapshot_dir}..."
+  else
+    echo "Snapshot ${snapshot_name} for YUM repository ${repo_name} already exists in  ${snapshot_dir}. Use --update to update it"
+    exit 3
+  fi
+else
+  previous_snapshot_dir="${snapshot_root_dir}/${previous_snapshot}/${snapshot_name}"
+  if [ -n "${previous_snapshot}" -a -d ${previous_snapshot_dir} ]
+  then
+    echo "Creating snapshot ${snapshot_name} of YUM repository ${repo_name} (${src_repo_path})) in ${snapshot_dir} from snapshot ${previous_snapshot}..."
+    if [ ! -d "${current_snapshot_dir}" ]
+    then
+      mkdir -p "${current_snapshot_dir}"
+    fi
+    process_directory ${previous_snapshot_dir} ${snapshot_dir} all
+  else
+    if [ -n "${previous_snapshot}" -a ! -d ${previous_snapshot_dir} ]
+    then
+      echo "Previous snapshot (${previous_snapshot}) not found for repository ${src_repo_path}"
+    fi
+    echo "Creating snapshot ${snapshot_name} of YUM repository ${repo_name} (${src_repo_path})) in ${snapshot_dir}..."
+  fi
+fi
+
+
+rpm_list=$(ls ${src_repo_path}/*.rpm 2>/dev/null)
+if [ $? -ne 0 -a ! -d ${src_repo_path}/Packages ]
+then
+  echo "${src_repo_path} doesn't appear to be a YUM repository. Aborting..."
+  exit 4
+fi
+
+process_directory ${src_repo_path} ${snapshot_dir}
+
+${quattor_yum_script_dir}/update_yum_repos ${snapshot_dir}
