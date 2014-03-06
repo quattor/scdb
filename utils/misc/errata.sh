@@ -1,6 +1,6 @@
 #!/bin/sh
 
-OS_LIST='sl510-x86_64 sl520-x86_64 sl530-x86_64 sl540-x86_64 sl550-x86_64 sl560-x86_64 sl570-i386 sl610-x86_64 sl620-x86_64'
+OS_LIST='sl510-x86_64 sl520-x86_64 sl530-x86_64 sl540-x86_64 sl550-x86_64 sl560-x86_64 sl570-i386 sl580-x86_64 sl590-x86_64 sl610-x86_64 sl620-x86_64 sl630-x86_64 sl640-x86_64'
 DATE=`date +%Y%m%d`
 
 # Verify current working directory
