@@ -1141,7 +1141,7 @@
               </xsl:variable>
               <xsl:if test="string(id) = 'kernel'">
                 <xsl:text># PKG_KERNEL_NAME can be overridden if not conforming to standard naming scheme
-variable PKG_KERNEL_NAME ?= '</xsl:text><xsl:value-of select="string(id)"/><xsl:text>'; 
+variable PKG_KERNEL_NAME ?= 'kernel'; 
 # PKG_KERNEL_RPM_NAME can be overridden if not conforming to standard naming scheme
 variable PKG_KERNEL_RPM_NAME ?= {
   rpmname = PKG_KERNEL_NAME;
