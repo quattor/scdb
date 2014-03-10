@@ -31,6 +31,7 @@ monitoring_dest_dir=cfg/standard/monitoring
 # Set to an empty string or comment out to disable renaming
 # Can be used for each repository but generally used only with -core
 core_rename_master=14.2.1
+ignore_branch_pattern='.*\.obsolete$'
 git_clone_root=/tmp/quattor-template-library
 scdb_dir=/tmp/scdb-vanilla
 checkout_templates=0
@@ -196,6 +197,10 @@ do
   for remote_branch in ${branch_list}
   do
     branch=$(echo ${remote_branch} | sed -e 's#^.*origin/##')
+    if [ -n "$(echo ${branch} | egrep ${ignore_branch_pattern})" ]
+    then
+      continue
+    fi
     branch_dir=${branch}
     if [ "${branch}" = "master" -a $?{master_dir_name} ]
     then
