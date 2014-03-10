@@ -27,6 +27,10 @@ grid_dest_dir=cfg/grid/%BRANCH%
 os_dest_dir=cfg/os/%BRANCH%
 standard_dest_dir=cfg/standard
 monitoring_dest_dir=cfg/standard/monitoring
+# Rename master branch from -core repo
+# Set to an empty string or comment out to disable renaming
+# Can be used for each repository but generally used only with -core
+core_rename_master=14.2.1
 git_clone_root=/tmp/quattor-template-library
 scdb_dir=/tmp/scdb-vanilla
 checkout_templates=0
@@ -166,11 +170,16 @@ do
   repo_name_variable=${repo}_git_repo
   branch_variable=${repo}_branch_def
   dest_dir_variable=${repo}_dest_dir
+  rename_master_variable=${repo}_rename_master
   repo_name=${!repo_name_variable}
   repo_url=${git_url_root}/${repo_name}.git
   repo_dir=${git_clone_root}/${repo_name}
   branch_pattern=${!branch_variable}
   git_clone_dir=${git_clone_root}/${repo}
+  if [ $?{!rename_master_variable} ]
+  then
+    master_dir_name=${!rename_master_variable}
+  fi
 
   echo Cloning Git repository ${repo_url} in ${repo_dir}...
   export GIT_WORK_TREE=${repo_dir}
@@ -187,7 +196,12 @@ do
   for remote_branch in ${branch_list}
   do
     branch=$(echo ${remote_branch} | sed -e 's#^.*origin/##')
-    dest_dir=${scdb_dir}/$(echo ${!dest_dir_variable} | sed -e "s#%BRANCH%#${branch}#")
+    branch_dir=${branch}
+    if [ "${branch}" = "master" -a $?{master_dir_name} ]
+    then
+      branch_dir=${master_dir_name}
+    fi
+    dest_dir=${scdb_dir}/$(echo ${!dest_dir_variable} | sed -e "s#%BRANCH%#${branch_dir}#")
     # os repository is a special case: '-spma' suffix must be removed to build the destination directory
     if [ ${repo} = "os" ]
     then
