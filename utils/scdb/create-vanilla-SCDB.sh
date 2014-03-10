@@ -17,7 +17,7 @@ standard_git_repo=template-library-standard
 monitoring_git_repo=template-library-monitoring
 core_branch_def=.*
 examples_branch_def=master
-grid_branch_def=umd-3
+grid_branch_def=.*
 os_branch_def=.*
 standard_branch_def=master
 monitoring_branch_def=master
@@ -27,12 +27,18 @@ grid_dest_dir=cfg/grid/%BRANCH%
 os_dest_dir=cfg/os/%BRANCH%
 standard_dest_dir=cfg/standard
 monitoring_dest_dir=cfg/standard/monitoring
+# Rename master branch from -core repo
+# Set to an empty string or comment out to disable renaming
+# Can be used for each repository but generally used only with -core
+core_rename_master=14.2.1
+ignore_branch_pattern='.*\.obsolete$'
 git_clone_root=/tmp/quattor-template-library
 scdb_dir=/tmp/scdb-vanilla
 checkout_templates=0
 list_branches=0
 remove_scdb=0
 externals_root_url=https://svn.lal.in2p3.fr/LCG/QWG/External
+scdb_external_list="ant panc scdb-ant-utils svnkit"
 panc_version=panc-9.3
 ant_version=apache-ant-1.7.1
 scdb_ant_utils_version=scdb-ant-utils-9.0.2
@@ -55,6 +61,25 @@ usage () {
   exit 1
 }
 
+copy_scdb_external () {
+  if [ -z "$1" ]
+  then
+    echo "Internal error: missing destination directory in copy_scdb_exernal()"
+    exit 20
+  fi
+  if [ -z "$2" ]
+  then
+    echo "Internal error: missing external version in copy_scdb_exernal()"
+    exit 20
+  fi
+  echo "Adding $1 version $2..."
+  svn export ${externals_root_url}/$2 ${scdb_dir}/external/$1 > /dev/null
+  if [ $? -ne 0 ]
+  then
+    echo "Error adding $1. Aborting..."
+    exit 21
+  fi
+}
 
 while [ -n "`echo $1 | grep '^-'`" ]
 do
@@ -132,45 +157,28 @@ then
   echo "Error creating vanilla SCDB. Aborting..."
   exit 1
 fi
-echo "Adding panc version ${panc_version}..."
-svn export ${externals_root_url}/${panc_version} ${scdb_dir}/external/panc > /dev/null
-if [ $? -ne 0 ]
-then
-  echo "Error adding panc. Aborting..."
-  exit 1
-fi
-echo "Adding ant version ${ant_version}..."
-svn export ${externals_root_url}/${ant_version} ${scdb_dir}/external/ant > /dev/null
-if [ $? -ne 0 ]
-then
-  echo "Error adding ant. Aborting..."
-  exit 1
-fi
-echo "Adding scdb-ant-utils version ${scdb_ant_utils_version}..."
-svn export ${externals_root_url}/${scdb_ant_utils_version} ${scdb_dir}/external/scdb-ant-utils > /dev/null
-if [ $? -ne 0 ]
-then
-  echo "Error adding scdb-ant-utils. Aborting..."
-  exit 1
-fi
-echo "Adding svnkit version ${svnkit_version}..."
-svn export ${externals_root_url}/${svnkit_version} ${scdb_dir}/external/svnkit > /dev/null
-if [ $? -ne 0 ]
-then
-  echo "Error adding ant. Aborting..."
-  exit 1
-fi
+for external in ${scdb_external_list}
+do
+  tmp=$(echo ${external} | sed -e 's/-/_/g')
+  external_version_variable=${tmp}_version
+  copy_scdb_external ${external} ${!external_version_variable}
+done
 
 for repo in ${git_repo_list}
 do
   repo_name_variable=${repo}_git_repo
   branch_variable=${repo}_branch_def
   dest_dir_variable=${repo}_dest_dir
+  rename_master_variable=${repo}_rename_master
   repo_name=${!repo_name_variable}
   repo_url=${git_url_root}/${repo_name}.git
   repo_dir=${git_clone_root}/${repo_name}
   branch_pattern=${!branch_variable}
   git_clone_dir=${git_clone_root}/${repo}
+  if [ $?{!rename_master_variable} ]
+  then
+    master_dir_name=${!rename_master_variable}
+  fi
 
   echo Cloning Git repository ${repo_url} in ${repo_dir}...
   export GIT_WORK_TREE=${repo_dir}
@@ -187,7 +195,16 @@ do
   for remote_branch in ${branch_list}
   do
     branch=$(echo ${remote_branch} | sed -e 's#^.*origin/##')
-    dest_dir=${scdb_dir}/$(echo ${!dest_dir_variable} | sed -e "s#%BRANCH%#${branch}#")
+    if [ -n "$(echo ${branch} | egrep ${ignore_branch_pattern})" ]
+    then
+      continue
+    fi
+    branch_dir=${branch}
+    if [ "${branch}" = "master" -a $?{master_dir_name} ]
+    then
+      branch_dir=${master_dir_name}
+    fi
+    dest_dir=${scdb_dir}/$(echo ${!dest_dir_variable} | sed -e "s#%BRANCH%#${branch_dir}#")
     # os repository is a special case: '-spma' suffix must be removed to build the destination directory
     if [ ${repo} = "os" ]
     then
