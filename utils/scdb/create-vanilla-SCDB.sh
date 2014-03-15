@@ -47,6 +47,11 @@ svnkit_version=svnkit-1.3.5
 # version/branch. By default, the root of the clone is 2 level upper than the directory
 # containing this script (util/scdb)
 scdb_source="$(dirname $0)/../.."
+if [ ! -e "${scdb_source}/quattor.build.xml" ]
+then
+  echo "$(basename $0) must be run from a scdb repository clone".
+  exit 1
+fi
 
 usage () {
   echo "usage:  `basename $0` [-F] [-D] [-d scdb_dir] [branch]"
