@@ -11,15 +11,87 @@
 group_file_list="../base/comps.xml repodata/comps-sl.xml"
 
 force_update=0
+verbose=0
 
 usage () {
-  echo "Usage:   $(basename $0) [--force] repos_parent..."
+  echo "Usage:   $(basename $0) [--debug] [--force] repos_parent..."
   exit 1
+}
+
+
+update_metadata () {
+  if [ -z "$1" ]
+  then
+    echo "Internal error: directory parameter missing"
+    exit 10
+  fi
+  # Add a trailing / to directory in case this is a symlink
+  local current_dir="$1/"
+  [ ${verbose} -eq 1 ] && echo "Processing directory ${current_dir}..."
+
+  local rpm_files=$(ls ${current_dir}/*-*.*.rpm 2>/dev/null)
+  if [ -z "${rpm_files}" -a -d "${current_dir}/repodata" ]
+  then
+    echo "Skipping ${current_dir}: OS-related repository"
+    return
+  fi
+
+  # Recursively process every subdirectory.
+  # If a subdirectory contains repodata but no RPMs (RPMs in subdirectories), stop
+  # processing it (this is probably an OS-related repository)
+  local repos_dirs=$(find -L ${current_dir} -maxdepth 1 -type d -or -type l | egrep -v "^${current_dir}\$")
+  for repo_dir in ${repos_dirs}
+  do
+     update_metadata ${repo_dir}
+  done
+
+  # Rebuild metadata in the current directory if there is RPMs in it
+  if [ -z "${rpm_files}" ]
+  then
+    #echo "$dir doesn't contain RPM files. Ignoring..."
+    continue
+  fi
+  echo "Updating YUM metadata in $current_dir..."
+  
+  # Check if there is a RPM group file in one of the usual locations.
+  # This should happen only for OS repositories where these files are located in
+  # one of the following location:
+  #    - SL4: ../base/comps.xml
+  #    - SL5: repodata/comps-sl.xml
+  # Note that there is no easy way to tell a repository is for OS distribution, so
+  # the check is done for every repository.
+  
+  local rpm_group_file=''
+  for group_file in ${group_file_list}
+  do
+    if [ -f ${current_dir}/${group_file} ]
+    then
+      rpm_group_file="-g ${current_dir}/${group_file}"
+      echo "Detected RPM group file. Configuring createrepo to use it (${rpm_group_file})..."
+      break
+    fi
+  done
+  
+  log_file=/tmp/$(basename $0)$(echo ${current_dir}|sed -e 's%/%_%g').err
+  createrepo ${createrepo_opts} ${rpm_group_file} ${current_dir} >/dev/null 2> ${log_file}
+  if [ $? -ne 0 ]
+  then
+    echo "Failed to update YUM metadata in $current_dir (see ${log_file} for details"
+  else
+    if [ ! -s  ${log_file} ]
+    then
+      rm -f ${log_file}
+    fi
+  fi
 }
 
 while [ -n "$(echo $1 |grep '^-')" ]
 do
   case $1 in
+    --debug)
+        verbose=1
+        ;;
+
     -h|--help)
          usage
          ;;
@@ -57,47 +129,6 @@ do
     echo "Error: ${repos_parent} is not a valid repository parent"
     continue
   fi
-  # Add a trailing / to repos_parent in case this is a symlink
-  repos_dirs=$(find -L ${repos_parent}/ -type d -or -type l)
-  
-  for dir in $repos_dirs
-  do
-    if [ -z "$(ls ${dir}/*-*.*.rpm 2>/dev/null)" ]
-    then
-      #echo "$dir doesn't contain RPM files. Ignoring..."
-      continue
-    fi
-    echo "Updating YUM metadata in $dir..."
-    
-    # Check if there is a RPM group file in one of the usual locations.
-    # This should happen only for OS repositories where these files are located in
-    # one of the following location:
-    #    - SL4: ../base/comps.xml
-    #    - SL5: repodata/comps-sl.xml
-    # Note that there is no easy way to tell a repository is for OS distribution, so
-    # the check is done for every repository.
-    
-    rpm_group_file=''
-    for group_file in ${group_file_list}
-    do
-      if [ -f ${dir}/${group_file} ]
-      then
-        rpm_group_file="-g ${dir}/${group_file}"
-        echo "Detected RPM group file. Configuring createrepo to use it (${rpm_group_file})..."
-        break
-      fi
-    done
-    
-    log_file=/tmp/$(basename $0)$(echo $dir|sed -e 's%/%_%g').err
-    createrepo ${createrepo_opts} ${rpm_group_file} ${dir} >/dev/null 2> ${log_file}
-    if [ $? -ne 0 ]
-    then
-      echo "Failed to update YUM metadata in $dir (see ${log_file} for details"
-    else
-      if [ ! -s  ${log_file} ]
-      then
-        rm -f ${log_file}
-      fi
-    fi
-  done
+
+  update_metadata ${repos_parent}
 done
