@@ -7,7 +7,7 @@
 # Written by Michel Jouvin <jouvin@lal.in2p3.fr>, 30/9/2013
 #
 
-git_url_root=git@github.com:quattor
+git_url_root=https://github.com/quattor
 git_repo_list='core examples grid os standard monitoring'
 core_git_repo=template-library-core
 examples_git_repo=template-library-examples
