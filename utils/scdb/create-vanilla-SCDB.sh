@@ -31,12 +31,13 @@ monitoring_dest_dir=cfg/standard/monitoring
 # Set to an empty string or comment out to disable renaming
 # Can be used for each repository but generally used only with -core
 core_rename_master=14.2.1
-ignore_branch_pattern='.*\.obsolete$'
+ignore_branch_patterns='\.obsolete$'
 git_clone_root=/tmp/quattor-template-library
 scdb_dir=/tmp/scdb-vanilla
-checkout_templates=0
 list_branches=0
 remove_scdb=0
+verbose=0
+add_legacy=0
 externals_root_url=https://svn.lal.in2p3.fr/LCG/QWG/External
 scdb_external_list="ant panc scdb-ant-utils svnkit"
 panc_version=panc-9.3
@@ -89,13 +90,17 @@ copy_scdb_external () {
 while [ -n "`echo $1 | grep '^-'`" ]
 do
   case $1 in
+  --add-legacy)
+     add_legacy=1
+     ;;
+
   -d)
     shift
     scdb_dir=$1
     ;;
 
-  -D)
-    checkout_templates=1
+  --debug)
+    verbose=1
     ;;
 
   -l)
@@ -117,6 +122,11 @@ do
   esac
   shift
 done
+
+if [ ${add_legacy} -ne 1 ]
+then
+  ignore_branch_patterns="${ignore_branch_patterns} legacy$"
+fi
 
 # If -l has been specified, list available branches and exit
 if [ $list_branches -eq 1 ]
@@ -200,7 +210,18 @@ do
   for remote_branch in ${branch_list}
   do
     branch=$(echo ${remote_branch} | sed -e 's#^.*origin/##')
-    if [ -n "$(echo ${branch} | egrep ${ignore_branch_pattern})" ]
+    ignore_branch=0
+    for ignore_pattern in ${ignore_branch_patterns}
+    do
+      [ ${verbose} -eq 1 ] && echo "Branch=${remote_branch}, ignore_pattern = >>${ignore_pattern}<<"
+      if [ -n "$(echo ${branch} | egrep ${ignore_pattern})" ]
+      then
+        echo "Branch ${remote_branch} ignored"
+        ignore_branch=1
+        continue
+      fi
+    done
+    if [ ${ignore_branch} -eq 1 ]
     then
       continue
     fi
