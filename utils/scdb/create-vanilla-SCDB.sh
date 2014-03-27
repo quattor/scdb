@@ -15,7 +15,8 @@ grid_git_repo=template-library-grid
 os_git_repo=template-library-os
 standard_git_repo=template-library-standard
 monitoring_git_repo=template-library-monitoring
-core_branch_def=.*
+core_branch_def='legacy|13\.1\.3|14\..*'
+core_use_tags=1
 examples_branch_def=master
 grid_branch_def=.*
 os_branch_def=.*
@@ -55,11 +56,11 @@ then
 fi
 
 usage () {
-  echo "usage:  `basename $0` [-F] [-D] [-d scdb_dir] [branch]"
+  echo "usage:  `basename $0` [-F] [--debug] [-d scdb_dir] [branch]"
   echo ""
   echo "        -d scdb_dir : directory where to create SCDB."
   echo "                      (D: ${scdb_dir})"
-  echo "        -D : debug mode. Checkout rather than export templates"
+  echo "        --debug : debug mode. Checkout rather than export templates"
   echo "        -F : remove scdb_dir if it already exists."
   echo "        -l : list available branches."
   echo "        -S : SCDB source (D: ${scdb_source})"
@@ -185,10 +186,12 @@ do
   branch_variable=${repo}_branch_def
   dest_dir_variable=${repo}_dest_dir
   rename_master_variable=${repo}_rename_master
+  use_tags_variable=${repo}_use_tags
   repo_name=${!repo_name_variable}
   repo_url=${git_url_root}/${repo_name}.git
   repo_dir=${git_clone_root}/${repo_name}
   branch_pattern=${!branch_variable}
+  use_tags=${!use_tags_variable}
   git_clone_dir=${git_clone_root}/${repo}
   if [ $?{!rename_master_variable} ]
   then
@@ -206,7 +209,14 @@ do
   fi
 
   # In fact branch can be a regexp matched against existing branch names
-  branch_list=$(git branch -r | grep origin/${branch_pattern} | grep -v HEAD)
+  if [ ${use_tags} -eq 1 ]
+  then
+    [ ${verbose} -eq 1 ] && echo "Using tags rather than branches for repository ${repo} (branch pattern=${branch_pattern})"
+    branch_list=$(git tag | egrep "${branch_pattern}")
+  else
+    branch_list=$(git branch -r | egrep "origin/${branch_pattern}" | grep -v HEAD)
+  fi
+  [  ${verbose} -eq 1 ] && echo "Branches/tags found: ${branch_list}"
   for remote_branch in ${branch_list}
   do
     branch=$(echo ${remote_branch} | sed -e 's#^.*origin/##')
