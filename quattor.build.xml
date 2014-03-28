@@ -41,7 +41,8 @@
 
   <!-- build subdirectories (local to sub-ant builds) -->
   <property name="build" location="build" />
-  <property name="build.xml" location="${build}/xml" />
+  <property name="build.profiles.dir" value="profiles" />
+  <property name="build.xml" location="${build}/${build.profiles.dir}" />
   <property name="build.log" location="${build}/log" />
   <property name="build.timestamps" location="${build}/timestamps" />
   <property name="build.annotations" location="${build}/annotations" />
@@ -338,7 +339,7 @@
     </path>
 
     <panc verbose="true" warnings="off" checkDependencies="true"
-          maxIteration="5000" debugTask="${compile.debug.task}" formats="pan,dep"
+          maxIteration="5000" debugTask="${compile.debug.task}" formats="${pan.formats}"
           outputDir="${outputdir}" includeroot="${cfg}" includes="${cluster.pan.includes}"
           logging="${pan.logging}"
           logfile="${pan.logfile}" ignoreDependencyPattern="${pan.dep.ignore}"
@@ -386,7 +387,10 @@
     <!-- Copy all of the generated profiles. -->
     <copy todir="${deploy.xml}">
       <fileset dir="${build.xml}">
-        <include name="**/*" />
+        <include name="**/*.xml" />
+        <include name="**/*.xml.gz" />
+        <include name="**/*.json" />
+        <include name="**/*.json.gz" />
       </fileset>
     </copy>
 
@@ -396,7 +400,10 @@
     <!-- Notify all of the quattor client machines. -->
     <quattor-notify message="ccm" port="7777">
       <fileset dir="${build.xml}">
-      	<include name="**/*"/>
+        <include name="**/*.xml" />
+        <include name="**/*.xml.gz" />
+        <include name="**/*.json" />
+        <include name="**/*.json.gz" />
         <exclude name="**/profile-info.xml" />
       </fileset>
     </quattor-notify>
