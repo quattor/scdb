@@ -64,7 +64,9 @@
 
   <!-- pan compiler flags -->
   <property name="pan.debug.include" value="^$" />
-  <property name="pan.debug.exclude" value=".+" />
+  <condition property="pan.debug.exclude" value="" else=".+">
+    <isset property="pan.debug.include" />
+  </condition>
   <property name="pan.formats" value="pan,dep" />
   <property name="pan.warnings" value="on" />
   <property name="pan.logging" value="none" />
