@@ -21,8 +21,6 @@ my @comp_list;
 my %options = ();
 &GetOptions(\%options, "all",
                        "comp-dir=s", 
-                       "core",
-                       "grid",
                        "help",
                        "source=s", 
                        "version=s",
@@ -40,19 +38,13 @@ if ( defined($options{version}) ) {
   $version = $options{version};
 }
 
-if ( defined($options{core}) && defined($options{grid}) ) {
-  print STDERR "Error: --core and --grid are mutualy exclusive.\n";
-  exit 2;
-};
-
-if ( !defined($options{core}) && !defined($options{grid}) ) {
-  print STDERR "Error: either --core or --grid must be specified.\n";
-  usage();
-  exit 2;
-};
-
 unless ( defined($options{source}) ) {
   print STDERR "Error: no source specified for components\n";
+  usage();
+}
+
+unless ( defined($options{'comp-dir'}) ) {
+  print STDERR "Error: --comp-dir must be specified\n";
   usage();
 }
 
@@ -87,20 +79,8 @@ if ( $all_comps ) {
   @comp_list = @ARGV;
 }
 
-if ( defined($options{'comp-dir'}) ) {
-  push @component_root, $options{'comp-dir'};
-} else {
-  if ( defined($options{core}) ) {
-    push @component_root, 'cfg/standard/components';
-  } else {
-    opendir(GRIDTEMPL, 'cfg/grid') || die 'Error reading cfg/grid directory';
-    my @grid_versions = grep /^[^\.]/, readdir(GRIDTEMPL);
-    closedir (GRIDTEMPL);
-    foreach my $version (@grid_versions) {
-      push @component_root, 'cfg/grid/'.$version.'/components';
-    }
-  }
-}
+# In old versions, it was possible to speciy several installation directories
+push @component_root, $options{'comp-dir'};
 foreach my $install_root (@component_root) {
   unless ( -d $install_root ) {
     print STDERR "Error: installation directory for templates ($install_root) doesn't exist\n";
@@ -199,7 +179,6 @@ Sources must be an up-to-date copy of Git repositories for Quattor configuration
 Usage:  updateComponent [--comp-dir SCDB_comp_dir] \
                         [--verbose] \
                         [--all] \
-                        --core|--grid \
                         --source comp_source \
                         component [component...]
 
@@ -211,17 +190,9 @@ if ( $usage_only ) {
 
 } else {
   print <<EOF
-    --comp-dir SCDB_comp_dir : where to install component templates. Defaults assumes
-                               the script is run from SCDB top directory and is
-                               based on --source : cfg/standard/components for core
-                               components, cfg/grid/*/components for others.
+    --comp-dir SCDB_comp_dir : where to install component templates. No default.
 
-    --source comp_source : directory containing all the component sources 
-                                with the same structure as in CVS (can be CVS
-                                checkout). Example : /cvs/co/ncm-components/core.
-
-    --core: core configuration module (mutually exclusive with --grid)
-    --grid: grid configurtion module (mutually exclusive with --core)
+    --source comp_source : directory containing all the component sources. 
 
     --version x: configuration module version to use (must match a git commit)
 
