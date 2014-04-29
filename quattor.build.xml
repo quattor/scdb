@@ -203,7 +203,7 @@
   <target name="check.syntax" depends="init,define.tasks" description="Check syntax of pan templates">
 
     <!-- Syntax check only!  Don't build any machine configurations or write object files. -->
-    <panc warnings="${pan.warnings}" formats="none" verbose="true">
+    <panc-check-syntax warnings="${pan.warnings}" verbose="true">
 
       <!-- Only select files newer than the timestamp file. -->
       <fileset dir="${cfg}">
@@ -211,7 +211,7 @@
           <mapper type="merge" to="check.syntax" />
         </depend>
       </fileset>
-    </panc>
+    </panc-check-syntax>
 
     <!-- Update timestamp for the syntax check. -->
     <touch file="${build.timestamps}/check.syntax" verbose="false" />
@@ -225,8 +225,7 @@
   <target name="compile.annotations" depends="init,define.tasks" description="Compile annotations from existing templates">
 
     <!-- Compile annotations only!  Don't build any machine configurations or write object files. -->
-    <panc warnings="${pan.warnings}" formats="none" 
-          annotationDirectory="${build.annotations}" verbose="true">
+    <panc-annotations baseDir="${cfg}" outputDir="${build.annotations}" verbose="true">
 
       <!-- Only select files newer than the timestamp file. -->
       <fileset dir="${cfg}">
@@ -234,7 +233,7 @@
           <mapper type="merge" to="compile.annotations" />
         </depend>
       </fileset>
-    </panc>
+    </panc-annotations>
 
     <!-- Update timestamp for the annotation compilation. -->
     <touch file="${build.timestamps}/compile.annotations" verbose="false" />
