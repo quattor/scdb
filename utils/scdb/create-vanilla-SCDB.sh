@@ -22,7 +22,7 @@ grid_branch_def=.*
 os_branch_def=.*
 standard_branch_def=master
 monitoring_branch_def=master
-core_dest_dir=cfg/quattor/%BRANCH%
+core_dest_dir=cfg/quattor/%TAG%
 examples_dest_dir=cfg
 grid_dest_dir=cfg/grid/%BRANCH%
 os_dest_dir=cfg/os/%BRANCH%
@@ -235,12 +235,20 @@ do
     then
       continue
     fi
-    branch_dir=${branch}
+    # branch_dir contains the branch name retrieved from the tag.
+    # tag_dir contains the tag version derived from the tag name with the prefix 
+    # (e.g. template-library-) removed. Define a non empty default value.
+    tag_dir="undefined_tag"
     if [ "${branch}" = "master" -a $?{master_dir_name} ]
     then
       branch_dir=${master_dir_name}
+    else
+      branch_dir=$(echo ${branch} | sed -e 's%^.*/%%' -e 's%-\([0-9\.]\+\)\+-[0-Z]\+$%%')
+      tag_dir=$(echo ${branch} | sed "s%^.*${branch_dir}-%%")
+      [ ${verbose} -eq 1 ] && echo branch_dir=$branch_dir, tag_dir=$tag_dir
     fi
-    dest_dir=${scdb_dir}/$(echo ${!dest_dir_variable} | sed -e "s#%BRANCH%#${branch_dir}#")
+    # Either %BRANCH% or %TAG% can be specified: no attempt to check that both are not use at the same time...
+    dest_dir=${scdb_dir}/$(echo ${!dest_dir_variable} | sed -e "s#%BRANCH%#${branch_dir}#" | sed -e "s#%TAG%#${tag_dir}#")
     # os repository is a special case: '-spma' suffix must be removed to build the destination directory
     if [ ${repo} = "os" ]
     then
