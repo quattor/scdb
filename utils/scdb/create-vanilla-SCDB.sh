@@ -7,8 +7,25 @@
 # Written by Michel Jouvin <jouvin@lal.in2p3.fr>, 30/9/2013
 #
 
+# Variables describing repositories to fetch to build the new SCDB.
+# For each repo xxx, the following variables must/may exist:
+#  - xxx_git_repo: name of the Git repo (at git_url_root url)
+#  - xxx_branch_def: a regexp to select the "branch" to fetch
+#                    ("branch" is matched against the branch or tag
+#                     according to xxx_use_tags)
+#  - xxx_use_tags (optional): use list of existing tags rather than list of branches
+#                             (D: use_tags_default)
+#  - xxx_ignore_version (optional): retrieve all branches/tags even if a specific
+#                                   version is requested (D: ignore_version_default)
+#  - xxx_dest_dir: directory where to put the repo contents, under SCDB root
+#                  (%BRANCH% is replaced by the "branch" name, %TAG% by the
+#                   Quattor version specified in the tag)
+#  - xxx_rename_master (optional): "branch name" to use if the branch is master
+
 git_url_root=https://github.com/quattor
 git_repo_list='core examples grid os standard monitoring'
+use_tags_default=1
+ignore_version_default=0
 core_git_repo=template-library-core
 examples_git_repo=template-library-examples
 grid_git_repo=template-library-grid
@@ -16,12 +33,15 @@ os_git_repo=template-library-os
 standard_git_repo=template-library-standard
 monitoring_git_repo=template-library-monitoring
 core_branch_def='legacy|13\.1\.3|14\..*'
-core_use_tags=1
 examples_branch_def=master
 grid_branch_def=.*
 os_branch_def=.*
-standard_branch_def=master
+example_branch_def=master
 monitoring_branch_def=master
+standard_branch_def=master
+standard_use_tags=0
+monitoring_use_tags=0
+core_ignore_version=1
 core_dest_dir=cfg/quattor/%TAG%
 examples_dest_dir=cfg
 grid_dest_dir=cfg/grid/%BRANCH%
@@ -32,7 +52,9 @@ monitoring_dest_dir=cfg/standard/monitoring
 # Set to an empty string or comment out to disable renaming
 # Can be used for each repository but generally used only with -core
 core_rename_master=14.2.1
-ignore_branch_patterns='\.obsolete$'
+# If a branch name matches one of the pattern, it will be ignored
+# HEAD added to workaround a bug in the release procedure when producing 14.5
+ignore_branch_patterns='\.obsolete$ ^HEAD$'
 git_clone_root=/tmp/quattor-template-library
 scdb_dir=/tmp/scdb-vanilla
 list_branches=0
@@ -56,7 +78,7 @@ then
 fi
 
 usage () {
-  echo "usage:  `basename $0` [-F] [--debug] [-d scdb_dir] [branch]"
+  echo "usage:  `basename $0` [-F] [--debug] [-d scdb_dir] [quattor_version]"
   echo ""
   echo "        -d scdb_dir : directory where to create SCDB."
   echo "                      (D: ${scdb_dir})"
@@ -124,6 +146,15 @@ do
   shift
 done
 
+if [ -n "$1" ]
+then
+  quattor_version=$1
+else
+  quattor_version=
+  echo "Temporary: quattor version to checkout is required"
+  exit 1
+fi
+
 if [ ${add_legacy} -ne 1 ]
 then
   ignore_branch_patterns="${ignore_branch_patterns} legacy$"
@@ -187,11 +218,21 @@ do
   dest_dir_variable=${repo}_dest_dir
   rename_master_variable=${repo}_rename_master
   use_tags_variable=${repo}_use_tags
+  ignore_version_variable=${repo}_ignore_version
   repo_name=${!repo_name_variable}
   repo_url=${git_url_root}/${repo_name}.git
   repo_dir=${git_clone_root}/${repo_name}
   branch_pattern=${!branch_variable}
   use_tags=${!use_tags_variable}
+  if [ -z ${use_tags} ]
+  then
+    use_tags=${use_tags_default}
+  fi
+  ignore_version=${!ignore_version_variable}
+  if [ -z ${ignore_version} ]
+  then
+    ignore_version=${ignore_version_default}
+  fi
   git_clone_dir=${git_clone_root}/${repo}
   if [ $?{!rename_master_variable} ]
   then
@@ -208,9 +249,13 @@ do
     exit 10
   fi
 
-  # In fact branch can be a regexp matched against existing branch names
+  # In fact branch_pattern can be a regexp matched against existing branch names
   if [ ${use_tags} -eq 1 ]
   then
+    if [ -n "${quattor_version}" -a ${ignore_version} -eq 0 ]
+    then
+      branch_pattern="${branch_pattern}-${quattor_version}"
+    fi
     [ ${verbose} -eq 1 ] && echo "Using tags rather than branches for repository ${repo} (branch pattern=${branch_pattern})"
     branch_list=$(git tag | egrep "${branch_pattern}")
   else
@@ -219,22 +264,9 @@ do
   [  ${verbose} -eq 1 ] && echo "Branches/tags found: ${branch_list}"
   for remote_branch in ${branch_list}
   do
+    # Remove origin/ from the branch name
     branch=$(echo ${remote_branch} | sed -e 's#^.*origin/##')
-    ignore_branch=0
-    for ignore_pattern in ${ignore_branch_patterns}
-    do
-      [ ${verbose} -eq 1 ] && echo "Branch=${remote_branch}, ignore_pattern = >>${ignore_pattern}<<"
-      if [ -n "$(echo ${branch} | egrep ${ignore_pattern})" ]
-      then
-        echo "Branch ${remote_branch} ignored"
-        ignore_branch=1
-        continue
-      fi
-    done
-    if [ ${ignore_branch} -eq 1 ]
-    then
-      continue
-    fi
+
     # branch_dir contains the branch name retrieved from the tag.
     # tag_dir contains the tag version derived from the tag name with the prefix 
     # (e.g. template-library-) removed. Define a non empty default value.
@@ -243,10 +275,28 @@ do
     then
       branch_dir=${master_dir_name}
     else
-      branch_dir=$(echo ${branch} | sed -e 's%^.*/%%' -e 's%-\([0-9\.]\+\)\+-[0-Z]\+$%%')
-      tag_dir=$(echo ${branch} | sed "s%^.*${branch_dir}-%%")
+      branch_dir=$(echo ${branch} | sed -e 's%-\([0-9\.]\+\)\+-[0-Z]\+$%%')
+      tag_dir=$(echo ${branch} | sed -e "s%^.*${branch_dir}-%%")
       [ ${verbose} -eq 1 ] && echo branch_dir=$branch_dir, tag_dir=$tag_dir
     fi
+
+    # Check if the branch should be ignored
+    ignore_branch=0
+    for ignore_pattern in ${ignore_branch_patterns}
+    do
+      [ ${verbose} -eq 1 ] && echo "Branch=${remote_branch}, ignore_pattern = >>${ignore_pattern}<<"
+      if [ -n "$(echo ${branch_dir} | egrep ${ignore_pattern})" ]
+      then
+        echo "Branch ${remote_branch} ignored"
+        ignore_branch=1
+        break
+      fi
+    done
+    if [ ${ignore_branch} -eq 1 ]
+    then
+      continue
+    fi
+
     # Either %BRANCH% or %TAG% can be specified: no attempt to check that both are not use at the same time...
     dest_dir=${scdb_dir}/$(echo ${!dest_dir_variable} | sed -e "s#%BRANCH%#${branch_dir}#" | sed -e "s#%TAG%#${tag_dir}#")
     # os repository is a special case: '-spma' suffix must be removed to build the destination directory
