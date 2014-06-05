@@ -10,11 +10,13 @@
 # Variables describing repositories to fetch to build the new SCDB.
 # For each repo xxx, the following variables must/may exist:
 #  - xxx_git_repo: name of the Git repo (at git_url_root url)
-#  - xxx_branch_def: a regexp to select the "branch" to fetch
-#                    ("branch" is matched against the branch or tag
-#                     according to xxx_use_tags)
+#  - xxx_branch_pattern: a regexp to select the "branch" to fetch
+#                        ("branch" is matched against the branch or tag
+#                         according to xxx_use_tags)
 #  - xxx_use_tags (optional): use list of existing tags rather than list of branches
 #                             (D: use_tags_default)
+#  - xxx_tags_ignore_pattern: ignore branch pattern when use_tags is true
+#                             (incompatible with xxx_ignore_version)
 #  - xxx_ignore_version (optional): retrieve all branches/tags even if a specific
 #                                   version is requested (D: ignore_version_default)
 #  - xxx_dest_dir: directory where to put the repo contents, under SCDB root
@@ -25,11 +27,16 @@
 git_url_root=https://github.com/quattor
 git_repo_list='core examples grid os standard monitoring'
 use_tags_default=1
+# Do not change the following defaults except if you know what you are doing...
 ignore_version_default=0
+tags_ignore_pattern_pattern=master
 
 core_git_repo=template-library-core
-core_branch_def='legacy|13\.1\.3|14\..*'
+core_branch_pattern='legacy|13\.1\.3|14\..*'
 core_dest_dir=cfg/quattor/%TAG%
+# With core repo, always checkout all tags matching core_branch_pattern,
+# whatever is done for other repos.
+core_use_tags=1
 core_ignore_version=1
 # Rename master branch from -core repo
 # Set to an empty string or comment out to disable renaming
@@ -37,26 +44,24 @@ core_ignore_version=1
 core_rename_master=14.2.1
 
 examples_git_repo=template-library-examples
-examples_branch_def=master
+examples_branch_pattern=master
 examples_dest_dir=cfg
 
 grid_git_repo=template-library-grid
-grid_branch_def=.*
+grid_branch_pattern=.*
 grid_dest_dir=cfg/grid/%BRANCH%
 
 os_git_repo=template-library-os
-os_branch_def=.*
+os_branch_pattern=.*
 os_dest_dir=cfg/os/%BRANCH%
 
 standard_git_repo=template-library-standard
-standard_branch_def=master
+standard_branch_pattern=master
 standard_dest_dir=cfg/standard
-standard_use_tags=0
 
 monitoring_git_repo=template-library-monitoring
-monitoring_branch_def=master
+monitoring_branch_pattern=master
 monitoring_dest_dir=cfg/standard/monitoring
-monitoring_use_tags=0
 
 # Other initializations
 # If a branch name matches one of the pattern, it will be ignored
@@ -92,7 +97,6 @@ usage () {
   echo "        --debug : debug mode. Checkout rather than export templates"
   echo "        -F : remove scdb_dir if it already exists."
   echo "        -l : list available branches."
-  echo "        -S : SCDB source (D: ${scdb_source})"
   echo ""
   exit 1
 }
@@ -139,11 +143,6 @@ do
 
   -F)
     remove_scdb=1
-    ;;
-
-  -S)
-    shift
-    scdb_version=$1
     ;;
 
   *)
@@ -213,11 +212,12 @@ done
 for repo in ${git_repo_list}
 do
   repo_name_variable=${repo}_git_repo
-  branch_variable=${repo}_branch_def
+  branch_variable=${repo}_branch_pattern
   dest_dir_variable=${repo}_dest_dir
   rename_master_variable=${repo}_rename_master
   use_tags_variable=${repo}_use_tags
   ignore_version_variable=${repo}_ignore_version
+  tags_ignore_pattern_variable=${repo}_tags_ignore_pattern
   repo_name=${!repo_name_variable}
   repo_url=${git_url_root}/${repo_name}.git
   repo_dir=${git_clone_root}/${repo_name}
@@ -232,6 +232,17 @@ do
   then
     ignore_version=${ignore_version_default}
   fi
+  tags_ignore_pattern=${!tags_ignore_pattern_variable}
+  if [ -z ${tags_ignore_pattern} ]
+  then
+    if [ -z "$(echo ${branch_pattern} | egrep -- ${tags_ignore_pattern_pattern})" ]
+    then
+      tags_ignore_pattern=0
+    else
+      tags_ignore_pattern=1
+    fi
+  fi
+
   git_clone_dir=${git_clone_root}/${repo}
   if [ $?{!rename_master_variable} ]
   then
@@ -253,10 +264,15 @@ do
   then
     if [ -n "${quattor_version}" -a ${ignore_version} -eq 0 ]
     then
-      branch_pattern="${branch_pattern}-${quattor_version}"
+      if [ ${tags_ignore_pattern} -eq 1 ]
+      then
+        branch_pattern="-${quattor_version}"
+      else
+        branch_pattern="${branch_pattern}-${quattor_version}"
+      fi
     fi
     [ ${verbose} -eq 1 ] && echo "Using tags rather than branches for repository ${repo} (branch pattern=${branch_pattern})"
-    branch_list=$(git tag | egrep "${branch_pattern}")
+    branch_list=$(git tag | egrep -- "${branch_pattern}")
   else
     branch_list=$(git branch -r | egrep "origin/${branch_pattern}" | grep -v HEAD)
   fi
@@ -286,7 +302,7 @@ do
     for ignore_pattern in ${ignore_branch_patterns}
     do
       [ ${verbose} -eq 1 ] && echo "Branch=${remote_branch}, ignore_pattern = >>${ignore_pattern}<<"
-      if [ -n "$(echo ${branch_dir} | egrep ${ignore_pattern})" ]
+      if [ -n "$(echo ${branch_dir} | egrep -- ${ignore_pattern})" ]
       then
         echo "Branch ${remote_branch} ignored"
         ignore_branch=1
