@@ -26,32 +26,39 @@ git_url_root=https://github.com/quattor
 git_repo_list='core examples grid os standard monitoring'
 use_tags_default=1
 ignore_version_default=0
+
 core_git_repo=template-library-core
-examples_git_repo=template-library-examples
-grid_git_repo=template-library-grid
-os_git_repo=template-library-os
-standard_git_repo=template-library-standard
-monitoring_git_repo=template-library-monitoring
 core_branch_def='legacy|13\.1\.3|14\..*'
-examples_branch_def=master
-grid_branch_def=.*
-os_branch_def=.*
-example_branch_def=master
-monitoring_branch_def=master
-standard_branch_def=master
-standard_use_tags=0
-monitoring_use_tags=0
-core_ignore_version=1
 core_dest_dir=cfg/quattor/%TAG%
-examples_dest_dir=cfg
-grid_dest_dir=cfg/grid/%BRANCH%
-os_dest_dir=cfg/os/%BRANCH%
-standard_dest_dir=cfg/standard
-monitoring_dest_dir=cfg/standard/monitoring
+core_ignore_version=1
 # Rename master branch from -core repo
 # Set to an empty string or comment out to disable renaming
 # Can be used for each repository but generally used only with -core
 core_rename_master=14.2.1
+
+examples_git_repo=template-library-examples
+examples_branch_def=master
+examples_dest_dir=cfg
+
+grid_git_repo=template-library-grid
+grid_branch_def=.*
+grid_dest_dir=cfg/grid/%BRANCH%
+
+os_git_repo=template-library-os
+os_branch_def=.*
+os_dest_dir=cfg/os/%BRANCH%
+
+standard_git_repo=template-library-standard
+standard_branch_def=master
+standard_dest_dir=cfg/standard
+standard_use_tags=0
+
+monitoring_git_repo=template-library-monitoring
+monitoring_branch_def=master
+monitoring_dest_dir=cfg/standard/monitoring
+monitoring_use_tags=0
+
+# Other initializations
 # If a branch name matches one of the pattern, it will be ignored
 # HEAD added to workaround a bug in the release procedure when producing 14.5
 ignore_branch_patterns='\.obsolete$ ^HEAD$'
