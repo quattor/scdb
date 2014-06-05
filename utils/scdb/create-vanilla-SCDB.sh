@@ -167,14 +167,6 @@ then
   ignore_branch_patterns="${ignore_branch_patterns} legacy$"
 fi
 
-# If -l has been specified, list available branches and exit
-if [ $list_branches -eq 1 ]
-then
-  git --git-dir ${scdb_source}/.git branch -a
-  exit 0
-fi
-
-
 # Check (or remove) the SCDB destination directory.
 if [ -d ${scdb_dir} ] 
 then
@@ -268,7 +260,9 @@ do
   else
     branch_list=$(git branch -r | egrep "origin/${branch_pattern}" | grep -v HEAD)
   fi
-  [  ${verbose} -eq 1 ] && echo "Branches/tags found: ${branch_list}"
+  [  ${verbose} -eq 1 -o ${list_branches} -eq 1 ] && echo -e "Branches/tags found in ${repo}:\n${branch_list}"
+  [ ${list_branches} -eq 1 ] && continue
+  
   for remote_branch in ${branch_list}
   do
     # Remove origin/ from the branch name
