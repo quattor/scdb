@@ -101,6 +101,16 @@ usage () {
   exit 1
 }
 
+# Redirect stdout and stderr to /dev/null, except if --debug
+silent_command () {
+  exec 3>&1 4>&2
+  [ $verbose -eq 0 ] && exec &>/dev/null
+  $*
+  status=$?
+  exec 1>&3 2>&4
+  return $status
+}
+
 copy_scdb_external () {
   if [ -z "$1" ]
   then
@@ -113,7 +123,7 @@ copy_scdb_external () {
     exit 20
   fi
   echo "Adding $1 version $2..."
-  svn export ${externals_root_url}/$2 ${scdb_dir}/external/$1 > /dev/null
+  silent_command svn export --quiet ${externals_root_url}/$2 ${scdb_dir}/external/$1
   if [ $? -ne 0 ]
   then
     echo "Error adding $1. Aborting..."
@@ -195,19 +205,23 @@ fi
 mkdir ${git_clone_root}
 
 
-echo "Creating vanilla SCDB from $scdb_source in $scdb_dir..."
-cp -R ${scdb_source}/* ${scdb_dir}
-if [ $? -ne 0 ]
+# Do not create SCDB if -l (list selected branches only)
+if [ $list_branches -eq 0 ]
 then
-  echo "Error creating vanilla SCDB. Aborting..."
-  exit 1
+  echo "Creating vanilla SCDB from $scdb_source in $scdb_dir..."
+  cp -R ${scdb_source}/* ${scdb_dir}
+  if [ $? -ne 0 ]
+  then
+    echo "Error creating vanilla SCDB. Aborting..."
+    exit 1
+  fi
+  for external in ${scdb_external_list}
+  do
+    tmp=$(echo ${external} | sed -e 's/-/_/g')
+    external_version_variable=${tmp}_version
+    copy_scdb_external ${external} ${!external_version_variable}
+  done
 fi
-for external in ${scdb_external_list}
-do
-  tmp=$(echo ${external} | sed -e 's/-/_/g')
-  external_version_variable=${tmp}_version
-  copy_scdb_external ${external} ${!external_version_variable}
-done
 
 for repo in ${git_repo_list}
 do
@@ -252,7 +266,7 @@ do
   echo Cloning Git repository ${repo_url} in ${repo_dir}...
   export GIT_WORK_TREE=${repo_dir}
   export GIT_DIR=${repo_dir}/.git
-  git clone --no-checkout ${repo_url} ${GIT_DIR}
+  silent_command git clone --no-checkout ${repo_url} ${GIT_DIR}
   if [ $? -ne 0 ]
   then
     echo "Error cloning Git repository ${repo_url}"
@@ -322,11 +336,15 @@ do
       dest_dir=$(echo ${dest_dir} | sed -e 's/-spma//')
     fi
     echo Copying Git branch ${branch} contents to ${dest_dir}...
-    git checkout ${branch}
+    silent_command git checkout ${branch}
     mkdir -p ${dest_dir}
     cp -R ${repo_dir}/* ${dest_dir}
   done
 done
 
-echo "Compiling clusters/example..."
-(cd ${scdb_dir}; external/ant/bin/ant --noconfig)
+# Do not try to compile if -l (list selected branches only)
+if [ $list_branches -eq 0 ]
+then
+  echo "Compiling clusters/example..."
+  (cd ${scdb_dir}; external/ant/bin/ant --noconfig)
+fi
