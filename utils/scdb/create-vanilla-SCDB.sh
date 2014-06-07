@@ -104,7 +104,7 @@ usage () {
 # Redirect stdout and stderr to /dev/null, except if --debug
 silent_command () {
   exec 3>&1 4>&2
-  [ $verbose -eq 0 ] && exec &>/dev/null
+  [ ${verbose} -eq 0 ] && exec &>/dev/null
   $*
   status=$?
   exec 1>&3 2>&4
@@ -340,6 +340,12 @@ do
     mkdir -p ${dest_dir}
     cp -R ${repo_dir}/* ${dest_dir}
   done
+
+  # Except if --debug has been specified, remove Git clone created
+  if [ ${verbose} -eq 0 -a -d ${repo_dir} ]
+  then
+    rm -Rf ${repo_dir}
+  fi
 done
 
 # Do not try to compile if -l (list selected branches only)
