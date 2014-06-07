@@ -266,9 +266,9 @@ do
     then
       if [ ${tags_ignore_pattern} -eq 1 ]
       then
-        branch_pattern="-${quattor_version}"
+        branch_pattern="-${quattor_version}$"
       else
-        branch_pattern="${branch_pattern}-${quattor_version}"
+        branch_pattern="${branch_pattern}-${quattor_version}$"
       fi
     fi
     [ ${verbose} -eq 1 ] && echo "Using tags rather than branches for repository ${repo} (branch pattern=${branch_pattern})"
@@ -292,7 +292,7 @@ do
     then
       branch_dir=${master_dir_name}
     else
-      branch_dir=$(echo ${branch} | sed -e 's%-\([0-9\.]\+\)\+-[0-Z]\+$%%')
+      branch_dir=$(echo ${branch} | sed -e 's%-\([0-9\.]\+\)\+\(-[0-Z]\+\)*$%%')
       tag_dir=$(echo ${branch} | sed -e "s%^.*${branch_dir}-%%")
       [ ${verbose} -eq 1 ] && echo branch_dir=$branch_dir, tag_dir=$tag_dir
     fi
