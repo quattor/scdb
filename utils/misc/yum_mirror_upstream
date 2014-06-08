@@ -8,17 +8,13 @@ rsync_base_options="-avkSH --delete"
 # For each repo, assign it a name in repos_to_mirror and defines the 3
 # 3 variables related to each repo, as in the examples below. source
 # and destination are mandatory, rsync_options is optional.
-repos_to_mirror="sl5x sl6x internet2 web100"
+repos_to_mirror="sl5x sl6x"
 repo_sl5x_source="${sl_mirror}/5x/x86_64/"
 repo_sl5x_destination="${local_mirror_root}/os/sl5x-x86_64"
 repo_sl5x_rsync_options="--exclude=isolinux --exclude=sites/Fermi"
 repo_sl6x_source="${sl_mirror}/6x/x86_64/"
 repo_sl6x_destination="${local_mirror_root}/os/sl6x-x86_64"
 repo_sl6x_rsync_options="--exclude=iso"
-repo_internet2_source="rsync://software.internet2.edu/rpms/el6/x86_64/main/"
-repo_internet2_destination="${local_mirror_root}/internet2-x86_64"
-repo_web100_source="rsync://software.internet2.edu/web100_kernel/rpms/el6/x86_64/main/"
-repo_web100_destination="${local_mirror_root}/web100-x86_64"
 
 for repo in ${repos_to_mirror}
 do
