@@ -11,10 +11,11 @@
 group_file_list="../base/comps.xml repodata/comps-sl.xml"
 
 force_update=0
+sl5_compatible=1
 verbose=0
 
 usage () {
-  echo "Usage:   $(basename $0) [--debug] [--force] repos_parent..."
+  echo "Usage:   $(basename $0) [--debug] [--force] [--nosl5] repos_parent..."
   exit 1
 }
 
@@ -73,6 +74,7 @@ update_metadata () {
   done
   
   log_file=/tmp/$(basename $0)$(echo ${current_dir}|sed -e 's%/%_%g').err
+  #echo createrepo ${createrepo_opts} ${rpm_group_file} ${current_dir}
   createrepo ${createrepo_opts} ${rpm_group_file} ${current_dir} >/dev/null 2> ${log_file}
   if [ $? -ne 0 ]
   then
@@ -100,6 +102,10 @@ do
         force_update=1
         ;;
 
+    --nosl5)
+        sl5_compatible=0
+        ;;
+
     *)
          echo "Unsupported option ($1)"
          usage
@@ -115,6 +121,11 @@ then
 fi
 
 createrepo_opts='--update --database'
+if [ ${sl5_compatible} -eq 1 ]
+then
+  createrepo_opts="${createrepo_opts} -s sha"
+fi
+
 if [ ${force_update} -eq 0 ]
 then
   createrepo_opts="${createrepo_opts} --checkts"
