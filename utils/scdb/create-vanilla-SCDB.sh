@@ -31,7 +31,9 @@ then
 fi
 
 usage () {
-  echo "usage:  `basename $0` [-F] [--debug] [-d scdb_dir] [quattor_version]"
+  echo "usage:  `basename $0` [-F] [--debug] [-d scdb_dir] [options...] [quattor_version]"
+  echo ""
+  echo "    Valid options are the following ones plus all valid get-template-library options:"
   echo ""
   echo "        -d scdb_dir : directory where to create SCDB."
   echo "                      (D: ${scdb_dir})"
@@ -99,6 +101,10 @@ do
     remove_scdb=1
     ;;
 
+  --help)
+    usage
+    ;;
+
   *)
     # All options unknown to this script are assumed to be options of the script used
     # to download the template library... Not ideal but wrong options will raise an 
@@ -110,6 +116,9 @@ do
     then
       tl_download_args="${tl_download_args} $2"
       shift
+    else
+      echo "Invalid option ($1). Aborting..."
+      usage
     fi
     ;;
   esac
