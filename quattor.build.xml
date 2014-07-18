@@ -341,7 +341,7 @@
           maxIteration="5000" debugTask="${compile.debug.task}" formats="${pan.formats}"
           outputDir="${outputdir}" includeroot="${cfg}" includes="${cluster.pan.includes}"
           logging="${pan.logging}"
-          logfile="${pan.logfile}" ignoreDependencyPattern="${pan.dep.ignore}"
+          logfile="${pan.logfile}" ignoreDependencyPattern="${cluster.pan.dep.ignore}"
     	  debugNsInclude="${pan.debug.include}" debugNsExclude="${pan.debug.exclude}">
 
       <!-- The load path and profiles to compile. -->
