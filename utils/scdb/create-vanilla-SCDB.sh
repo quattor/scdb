@@ -16,9 +16,9 @@ tl_download_args=""
 externals_root_url=https://svn.lal.in2p3.fr/LCG/QWG/External
 scdb_external_list="ant panc scdb-ant-utils svnkit"
 panc_version=panc-10.1
-ant_version=apache-ant-1.7.1
+ant_version=apache-ant-1.9.4
 scdb_ant_utils_version=scdb-ant-utils-9.0.2
-svnkit_version=svnkit-1.3.5
+svnkit_version=svnkit-1.8.6
 
 # scdb source is typically a clone of GitHub scdb repo, switched to the appropriate
 # version/branch. By default, the root of the clone is 2 level upper than the directory

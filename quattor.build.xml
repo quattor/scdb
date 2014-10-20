@@ -52,8 +52,7 @@
 
   <!-- svnkit -->
   <property name="svnkit" location="${external}/svnkit" />
-  <property name="svnkit.jar" location="${svnkit}/svnkit.jar" />
-  <property name="svnkit-javahl.jar" location="${svnkit}/svnkit-javahl.jar" />
+  <property name="svnkit.lib" location="${svnkit}/lib" />
 
   <!-- panc (java version) -->
   <property name="panc" location="${external}/panc" />
@@ -165,8 +164,9 @@
     <taskdef resource="org/quattor/ant/quattor-ant.xml">
       <classpath>
         <pathelement path="${quattor.jar}" />
-        <pathelement path="${svnkit.jar}" />
-        <pathelement path="${svnkit-javahl.jar}" />
+        <fileset dir="${svnkit.lib}">
+          <include name="*.jar"/>
+        </fileset>
       </classpath>
     </taskdef>
 
