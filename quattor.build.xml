@@ -440,4 +440,11 @@
   </target>
 
 
+  <!-- Show pan compiler version -->
+  <target name="panc.version" depends="init,define.tasks" description="Display pan compiler version">
+
+    <panc-version />
+
+  </target>
+
 </project>
