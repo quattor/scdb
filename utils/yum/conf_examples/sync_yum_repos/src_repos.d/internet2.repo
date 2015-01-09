@@ -1,0 +1,13 @@
+[internet2_tools]
+name=Internet2 tools (e.g. perfSonoar)
+baseurl=http://software.internet2.edu/rpms/el6/x86_64/main/
+enabled=0
+gpgcheck=1
+
+[internet2_kernel]
+name=Internet2 kernel (web100)
+baseurl=http://software.internet2.edu/web100_kernel/rpms/el6/x86_64/main
+enabled=0
+gpgcheck=1
+
+

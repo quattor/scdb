@@ -1,0 +1,14 @@
+
+[umd3_base_sl5]
+name=UMD3 SL5 base packages
+baseurl=http://repository.egi.eu/sw/production/umd/3/sl5/x86_64/base
+enabled=0
+gpgcheck=1
+
+
+[umd3_updates_sl5]
+name=UMD3 SL5 update packages
+baseurl=http://repository.egi.eu/sw/production/umd/3/sl5/x86_64/updates
+enabled=0
+gpgcheck=1
+

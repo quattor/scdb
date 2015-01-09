@@ -1,0 +1,21 @@
+
+[emi3_base_sl6]
+name=EMI3 SL6 base packages
+baseurl=http://emisoft.web.cern.ch/emisoft/dist/EMI/3/sl6/x86_64/base
+enabled=0
+gpgcheck=1
+
+
+[emi3_thirdparty_sl6]
+name=EMI3 SL6 third party packages
+baseurl=http://emisoft.web.cern.ch/emisoft/dist/EMI/3/sl6/x86_64/third-party
+enabled=0
+gpgcheck=1
+
+
+[emi3_updates_sl6]
+name=EMI3 SL6 update packages
+baseurl=http://emisoft.web.cern.ch/emisoft/dist/EMI/3/sl6/x86_64/updates
+enabled=0
+gpgcheck=1
+

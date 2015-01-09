@@ -1,0 +1,130 @@
+#!/bin/bash
+
+repo_list="/root/yum/conf/sync_yum_repos.conf"
+yum_conf=/root/yum/conf/yum.conf
+reposync_cmd="reposync --norepopath --config=${yum_conf} --downloadcomps"
+update_yum_metadata_cmd="/root/quattor/scripts/update_yum_repos"
+verbose=0
+update_yum_metadata=1
+repo_selected=
+
+usage () {
+  echo "Usage: $(basename $0) [--verbose|--debug] [--yum-config file] [--repo-list file] [--nometadata-update] [--repoid repository]"
+  exit 1
+}
+
+
+while [ -n "$(echo $1 |grep '^-')" ]
+do
+  case $1 in
+    -h|--help)
+         usage
+         ;;
+
+    --debug)
+       verbose=2
+       ;;
+
+    --nometadata-update)
+      update_yum_metadata=0
+      ;;
+
+    --repoid)
+       shift
+       repo_selected=$1
+       ;;
+
+    --repo-list)
+       shift
+       repo_list=$1
+       ;;
+
+    --verbose)
+       verbose=1
+       ;;
+
+    --yum-config)
+       shift
+       yum_conf=$1
+       ;;
+
+    *)
+       echo "Invalid option ($1). Aborting..."
+       usage
+       ;;
+
+  esac
+
+  shift
+
+done
+
+
+if [ ! -f ${yum_conf} ]
+then
+  echo "YUM configuration file to use with reposync (${yum_conf}) not found. Aborting..."
+  exit 1
+fi
+
+if [ ! -f ${repo_list} ]
+then
+  echo "Repository list to synchronize (${repo_list}) not found. Aborting..."
+  exit 1
+fi
+
+if [ ${verbose} -eq 0 ]
+then
+  reposync_cmd="${reposync_cmd} --quiet"
+fi
+
+repo_found=0
+while read repo_name repo_dir sync_options
+do
+  reposync_options=""
+  if [ -z "${repo_name}" -o -n "$(echo ${repo_name} | egrep '^#')" ]
+  then
+    continue
+  elif [ -n "${repo_selected}" -a "${repo_name}" != "${repo_selected}" ]
+  then
+    [ ${verbose} -ge 2 ] && echo "Repository ${repo_name} doesn't match selected repository ("${repo_selected}"). Ignoring..."
+    continue
+  fi
+
+  [ ${verbose} -ge 2 ] && echo "Processing entry: ${repo_name} ${repo_dir} ${sync_options}"
+  repo_found=1
+
+  IFS=', ' read -a options <<< "${sync_options}"
+  for option in "${options[@]}"
+  do
+    case ${option} in
+      purge)
+        reposync_options="${reposync_options} --delete"
+        ;;
+      *)
+        echo "Invalid sync_option (${option}). Aborting..."
+        exit 2
+        ;;
+    esac
+  done
+
+  echo "Synchronizing repository ${repo_name}..."
+  cmd_to_exec="${reposync_cmd} --repoid=${repo_name} --download_path ${repo_dir} ${reposync_options}"
+  [ ${verbose} -ge 1 ] && echo "Executing command '${cmd_to_exec}'"
+  ${cmd_to_exec}
+
+  # Logging is done by the command
+  if [ ${update_yum_metadata} -eq 1 ]
+  then
+    ${update_yum_metadata_cmd} ${repo_dir}
+  else
+    [ ${verbose} -ge 1 ] && echo "YUM metadata update disabled for repository ${repo_name} (${repo_dir})"
+  fi
+
+done < ${repo_list}
+
+if [ -n "${repo_selected}" -a ${repo_found} -eq 0 ]
+then
+  echo "Repository ${repo_selected} not found in configuration (${repo_list})"
+  exit 10
+fi
+

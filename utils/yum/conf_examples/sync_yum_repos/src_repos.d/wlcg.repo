@@ -1,0 +1,7 @@
+
+[wlcg_sl6]
+name=WLCG-specific packages (SL6)
+baseurl=http://linuxsoft.cern.ch/wlcg/sl6/x86_64
+enabled=0
+gpgcheck=1
+

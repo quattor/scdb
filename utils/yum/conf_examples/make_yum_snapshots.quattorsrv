@@ -1,0 +1,91 @@
+#!/bin/sh
+
+
+yum_snapshot=/root/quattor/scripts/yum_snapshot
+update_opt=
+show_commands=0
+previous_snapshot_opt=
+
+usage () {
+  echo "Usage: $(basename $0) [--show-commands] [--update] [--previous snapshot_date]"
+  exit 1
+}
+
+
+while [ -n "$(echo $1 |grep '^-')" ]
+do
+  case $1 in
+    -h|--help)
+         usage
+         ;;
+
+    --previous)
+        shift
+        previous_snapshot=$1
+        previous_snapshot_opt="--previous ${previous_snapshot}"
+        ;;
+
+    --show-commands)
+        show_commands=1
+        yum_snapshot="echo ${yum_snapshot}"
+        ;;
+
+    --update)
+       update_opt="--update"
+       ;;
+
+    *)
+       echo "Invalid option ($1). Aborting..."
+       usage
+       ;;
+
+  esac
+
+  shift
+
+done
+
+
+if [ ${show_commands} -eq 0 ]
+then
+  echo "$(date) - Starting creation of YUM snapshots..."
+else
+  echo "$(date) - List of commands to create YUM snapshots..."
+fi
+
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name el7x-x86_64 /www/htdocs/packages/os/el7x-x86_64/os
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name el7x-x86_64_errata /www/htdocs/packages/os/el7x-x86_64/updates/security
+
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name sl6x-x86_64 /www/htdocs/packages/os/sl6x-x86_64/os
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name sl6x-x86_64_errata /www/htdocs/packages/os/sl6x-x86_64/updates/security
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name sl6x-x86_64_fastbugs /www/htdocs/packages/os/sl6x-x86_64/updates/fastbugs
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name sl6x-x86_64_addons /www/htdocs/packages/os/sl6x-x86_64/addons
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name sl6x_devtoolset /www/htdocs/packages/os/sl6x-x86_64/external_products/devtoolset
+
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name sl610-x86_64 /www/htdocs/packages/os/sl610-x86_64/base
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name sl610-x86_64_errata /www/htdocs/packages/os/sl610-x86_64/errata
+
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name sl5x-x86_64 /www/htdocs/packages/os/sl5x-x86_64/base
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name sl5x-x86_64_errata /www/htdocs/packages/os/sl5x-x86_64/errata
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name sl5x-x86_64_fastbugs /www/htdocs/packages/os/sl5x-x86_64/fastbugs
+
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name egi_ca /www/htdocs/packages/ca
+
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name el7_epel /www/htdocs/packages/os/sl7/epel
+
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name sl6_epel /www/htdocs/packages/os/sl6/epel
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name sl6_epel_testing /www/htdocs/packages/os/sl6/epel-testing
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name sl6_addons /www/htdocs/packages/os/sl6/addons
+
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name sl5_epel /www/htdocs/packages/os/sl5/epel
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name sl5_addons /www/htdocs/packages/os/sl5/addons-yum
+
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name site /www/htdocs/packages/site
+
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name emi_3_base_sl6_x86_64 /www/htdocs/packages/emi/3.0/sl6/x86_64/base
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name emi_3_thirdparty_sl6_x86_64 /www/htdocs/packages/emi/3.0/sl6/x86_64/third-party
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name emi_3_updates_sl6_x86_64 /www/htdocs/packages/emi/3.0/sl6/x86_64/updates
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name wlcg-x86_64 /www/htdocs/packages/wlcg/x86_64
+${yum_snapshot} --verbose ${update_opt} ${previous_snapshot_opt} --snapshot-name cvmfs /www/htdocs/packages/CernVM-FS
+
+[ ${show_commands} -eq 0 ] && echo "$(date) - YUM snapshots completed"
