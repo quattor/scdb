@@ -1,0 +1,20 @@
+[epel_sl6]
+name=EPEL SL6 64-bit
+baseurl=http://mirrors.ircam.fr/pub/fedora/epel/6/x86_64/
+enabled=0
+gpgcheck=1
+
+
+[epel_sl6_testing]
+name=EPEL-testing SL6 64-bit
+baseurl=http://dl.fedoraproject.org/pub/epel/testing/6/x86_64
+enabled=0
+gpgcheck=1
+
+
+[epel_sl5]
+name=EPEL SL5 64-bit
+baseurl=http://mirrors.ircam.fr/pub/fedora/epel/5/x86_64/
+enabled=0
+gpgcheck=1
+
