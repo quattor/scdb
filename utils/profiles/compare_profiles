@@ -26,6 +26,7 @@ usage () {
   echo -e "\t-t : terse output (show only the configuration differences"
   echo -e "\t\twithout context, RPM differences ignored)"
   echo -e "\t-v : verbose output (show differences)"
+  echo -e "\t-w : ignore all white space"
   echo -e "\t--xml: use XML profiles for comparison (default)"
   echo -e ""
   exit
@@ -36,6 +37,7 @@ profile='*'
 check_dep_files=0
 json_profile=1
 terse_output=0
+diff_options=""
 dep_ext=.dep
 json_ext=.json
 xml_ext=.xml
@@ -46,23 +48,27 @@ do
     -d|--dep*)
       check_dep_files=1
       ;;
-      
+
     -h|--help)
       usage
       ;;
-      
+
     --json)
       json_profile=1
       ;;
-      
+
     -v|--ver*)
       verbose=1
       ;;
-      
+
+    -w|--ignore-all-space)
+      diff_options="-w"
+      ;;
+
     --xml)
       json_profile=0
       ;;
-      
+
     -p|--pro*)
       shift
       if [ -z "$1" ]
@@ -71,17 +77,17 @@ do
       fi
       profile=$1
       ;;
-      
+
     -t|--terse)
       terse_output=1
       ;;
-      
+
     *)
       echo "Unsupported option : $1"
       usage
       ;;
   esac
-  
+
   shift
 done
 
@@ -131,21 +137,19 @@ files=$(find $current_profile_dir -name "$file_pattern" -not -name profiles-info
 for file in $files
 do
    #echo $file
-    xmldiff=`diff $ref_dir $file`
+    xmldiff=`diff $diff_options $ref_dir $file`
     if [ $? -ne 0 ]
     then
       echo Differences found in $file
       if [ $verbose -gt 0 ]
       then
-        diff -u $ref_dir $file
+        diff -u $diff_options $ref_dir $file
         echo ""
        elif [ $terse_output -eq 1 ]
       then
-        diff -u $ref_dir $file | egrep '^-|\+' | grep -v version | \
+        diff -u $diff_options $ref_dir $file | egrep '^-|\+' | grep -v version | \
                      egrep -v '^(-|\+)</*[0-9a-f_]*>$' | grep -v '^@@.*@@$'
         echo ""
       fi
     fi
 done
-
-
