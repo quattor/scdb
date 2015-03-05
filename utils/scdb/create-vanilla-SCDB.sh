@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # This script creates a vanilla SCDB from GitHub site, with both
 # SCDB itself and the template library. The cluster examples are then compiled.
 #
