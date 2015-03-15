@@ -20,6 +20,7 @@ ant_version=apache-ant-1.9.4
 scdb_ant_utils_version=scdb-ant-utils-9.0.2
 svnkit_version=svnkit-1.8.6
 
+
 # scdb source is typically a clone of GitHub scdb repo, switched to the appropriate
 # version/branch. By default, the root of the clone is 2 level upper than the directory
 # containing this script (util/scdb)
@@ -198,6 +199,26 @@ then
   echo "Failed to download template libary. Check your options: must be valid for this script or ${tl_download_script}"
   usage
 fi
+
+
+# Create a quattor.build.properties file.
+# Enable the use of cluster groups only for version HEAD or a version >= 15.x as 
+# before the template-library-examples repo was not configured with cluster groups.
+# Version is last parameter of the command line: assume it is valid if template
+# library download succeeded.
+quattor_version=${!#}
+property_file=${scdb_dir}/quattor.build.properties
+echo "Creating ${property_file}..."
+cat <<EOF >  ${property_file}
+build.annotations=\${basedir}/build.annotations
+pan.formats=json,dep
+EOF
+if [ "${quattor_version}" \> "15." -o "${quattor_version}" = "HEAD" ]
+then
+  cat <<EOF >>  ${property_file}
+clusters.groups.enable=true
+EOF
+fi 
 
 
 # Compile examples
