@@ -19,6 +19,8 @@ panc_version=panc-10.1
 ant_version=apache-ant-1.9.4
 scdb_ant_utils_version=scdb-ant-utils-9.0.2
 svnkit_version=svnkit-1.8.6
+cluster_groups_default="grid"
+cluster_groups=
 
 
 # scdb source is typically a clone of GitHub scdb repo, switched to the appropriate
@@ -40,6 +42,7 @@ usage () {
   echo "                      (D: ${scdb_dir})"
   echo "        --debug : debug mode. Checkout rather than export templates"
   echo "        -F : remove scdb_dir if it already exists."
+  echo "        --group : cluster group to compile. Can be specified multiple times (D:${cluster_groups_default})"
   echo ""
   exit 1
 }
@@ -102,6 +105,11 @@ do
     remove_scdb=1
     ;;
 
+  --group)
+    shift
+    cluster_groups="${cluster_groups} $1 "
+    ;;
+
   --help)
     usage
     ;;
@@ -133,6 +141,22 @@ then
 else
   echo "Quattor version to checkout is required (use 'HEAD' for the most recent revision)"
   exit 1
+fi
+
+if [ "${tl_version}" \> "15." -o "${tl_version}" = "HEAD" ]
+then
+  cluster_groups_enabled=1
+  if [ -z "${cluster_groups}" ]
+  then
+    cluster_groups=${cluster_groups_default}
+  fi
+else
+  cluster_groups_enabled=0
+  if [ -n "${cluster_groups}" ]
+  then
+    echo "WARNING: --group option supported only for version HEAD or >= 15. Ignored."
+  fi
+  cluster_groups=default      # Informational
 fi
 
 
@@ -206,14 +230,13 @@ fi
 # before the template-library-examples repo was not configured with cluster groups.
 # Version is last parameter of the command line: assume it is valid if template
 # library download succeeded.
-quattor_version=${!#}
 property_file=${scdb_dir}/quattor.build.properties
 echo "Creating ${property_file}..."
 cat <<EOF >  ${property_file}
 build.annotations=\${basedir}/build.annotations
 pan.formats=json,dep
 EOF
-if [ "${quattor_version}" \> "15." -o "${quattor_version}" = "HEAD" ]
+if [ ${cluster_groups_enabled} -eq 1 ]
 then
   cat <<EOF >>  ${property_file}
 clusters.groups.enable=true
@@ -222,5 +245,13 @@ fi
 
 
 # Compile examples
-echo "Compiling clusters/example..."
-(cd ${scdb_dir}; external/ant/bin/ant --noconfig)
+for group in ${cluster_groups}
+do
+  echo "Compiling clusters/example (group=${group})..."
+  ant_options=""
+  if [ ${cluster_groups_enabled} -eq 1 ]
+  then
+    ant_options="-Dcluster.group=${group}"
+  fi
+  (cd ${scdb_dir}; external/ant/bin/ant --noconfig ${ant_options})
+done
