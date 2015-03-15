@@ -5,8 +5,8 @@
 # Written by Michel Jouvin <jouvin@lal.in2p3.fr>, 30/9/2013
 #
 
-git_clone_root=/tmp/quattor-template-library
-scdb_dir=/tmp/scdb-vanilla
+git_clone_root=${TMPDIR:-/tmp}/quattor-template-library
+scdb_dir=${TMPDIR:-/tmp}/scdb-vanilla
 tl_download_script=get-template-library
 github_repos_url=https://github.com/quattor
 release_tools_repo=release
