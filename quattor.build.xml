@@ -24,9 +24,9 @@
   <!-- To enable a hierarchical arrangement of clusters as cluster groups,
        set clusters.groups.enable to true. --> 
   <property name="clusters.groups.enable" value="false" />
-  <!-- To create one deployment directory per cluster group, set clusters.groups.xml to true.
+  <!-- To create one deployment directory per cluster group, set clusters.groups.profiles to true.
        Not that this requires an appropriate profile path in ccm configuration on managed nodes. -->
-  <property name="clusters.groups.xml" value="false" />
+  <property name="clusters.groups.profiles" value="false" />
   <!-- Backward compatibility (group.name was renamed cluster.group for consistency -->
   <condition property="cluster.group" value="${group.name}">
     <isset property="group.name" />
@@ -37,12 +37,12 @@
 
   <!-- deploy subdirectories -->
   <property name="deploy" location="deploy" />
-  <property name="deploy.xml" location="${deploy}/xml" />
+  <property name="deploy.profiles" location="${deploy}/profiles" />
 
   <!-- build subdirectories (local to sub-ant builds) -->
   <property name="build" location="build" />
   <property name="build.profiles.dir" value="profiles" />
-  <property name="build.xml" location="${build}/${build.profiles.dir}" />
+  <property name="build.profiles" location="${build}/${build.profiles.dir}" />
   <property name="build.log" location="${build}/log" />
   <property name="build.timestamps" location="${build}/timestamps" />
   <property name="build.annotations" location="${build}/annotations" />
@@ -120,7 +120,7 @@
     <tstamp />
 
     <!-- Make the build subdirectories. -->
-    <mkdir dir="${build.xml}" />
+    <mkdir dir="${build.profiles}" />
     <mkdir dir="${build.annotations}" />
     <mkdir dir="${build.timestamps}" />
     <mkdir dir="${build.log}" />
@@ -244,7 +244,7 @@
   <!--                                                               -->
   <!-- Compile all machine profiles                                  -->
   <!--                                                               -->
-  <target name="compile.profiles" depends="init,define.tasks,check.syntax" description="Compile machine XML profiles">
+  <target name="compile.profiles" depends="init,define.tasks,check.syntax" description="Compile machine profiles">
     <property name="quattorbasedir" value="${basedir}" />
 
     <!-- When cluster groups are enabled, execute compile.cluster.groups for each groups.
@@ -281,10 +281,10 @@
     <echo message="Compiling profiles for ${groupnamemsg}" />
 
     
-    <condition property="outputdir" value="${build.xml}/${groupname}" else="${build.xml}">
+    <condition property="outputdir" value="${build.profiles}/${groupname}" else="${build.profiles}">
       <and>
         <istrue value="${clusters.groups.enable}" />
-        <istrue value="${clusters.groups.xml}" />
+        <istrue value="${clusters.groups.profiles}" />
       </and>
     </condition>
 
@@ -380,12 +380,12 @@
   <target name="deploy.and.notify" depends="compile.profiles,define.tasks">
 
     <!-- Clear out all old profiles.  Remake the deploy directory. -->
-    <delete includeEmptyDirs="true" dir="${deploy.xml}" />
-    <mkdir dir="${deploy.xml}" />
+    <delete includeEmptyDirs="true" dir="${deploy.profiles}" />
+    <mkdir dir="${deploy.profiles}" />
 
     <!-- Copy all of the generated profiles. -->
-    <copy todir="${deploy.xml}">
-      <fileset dir="${build.xml}">
+    <copy todir="${deploy.profiles}">
+      <fileset dir="${build.profiles}">
         <include name="**/*.xml" />
         <include name="**/*.xml.gz" />
         <include name="**/*.json" />
@@ -394,11 +394,11 @@
     </copy>
 
     <!-- Update profiles-info.xml -->
-    <pan-profile-info profilesDirName="${deploy.xml}" debugTask="${profile.info.debug.task}" />
+    <pan-profile-info profilesDirName="${deploy.profiles}" debugTask="${profile.info.debug.task}" />
 
     <!-- Notify all of the quattor client machines. -->
     <quattor-notify message="ccm" port="7777">
-      <fileset dir="${build.xml}">
+      <fileset dir="${build.profiles}">
         <include name="**/*.xml" />
         <include name="**/*.xml.gz" />
         <include name="**/*.json" />
