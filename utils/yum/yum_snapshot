@@ -7,10 +7,12 @@
 #
 # Written by Michel Jouvin - CNRS LAL - 18/2/2014
 
-snapshot_root_dir=/www/htdocs/packages/yum/snapshots
+snapshot_root_dir=/www/htdocs/yum/snapshots
 update_snapshot=0
 verbose=0
 quattor_yum_script_dir=$(dirname $0)
+update_yum_metadata_cmd="${quattor_yum_script_dir}/update_yum_repos"
+update_yum_metadata_opts=""
 snapshot_name=
 previous_snapshot=
 
@@ -192,9 +194,12 @@ else
   fi
 fi
 
-
+# The source path is considered to be a YUM repository if:
+#  - it contains .rpm files (metadata will be created if they don't exist)
+#  - it contains no .rpm files but a repodata directory (typical for several OS-related repositories)
+#  - it contains no .rpm files, no repodata directory but a SL directory with a repodata (typical from SL5)
 rpm_list=$(ls ${src_repo_path}/*.rpm 2>/dev/null)
-if [ $? -ne 0 -a ! -d ${src_repo_path}/Packages ]
+if [ $? -ne 0 -a ! -d ${src_repo_path}/repodata -a ! -d ${src_repo_path}/SL/repodata ]
 then
   echo "${src_repo_path} doesn't appear to be a YUM repository. Aborting..."
   exit 4
@@ -202,4 +207,9 @@ fi
 
 process_directory ${src_repo_path} ${snapshot_dir}
 
-${quattor_yum_script_dir}/update_yum_repos ${snapshot_dir}
+# If snapshot name contains 'sl5' (case insensitive), ensure that repo metadata are SL5-compatible
+if [ -n "$(echo ${snapshot_name} | grep -i sl5)" ]
+then
+  update_yum_metadata_opts="${update_yum_metadata_opts} --sl5"
+fi
+${update_yum_metadata_cmd} ${update_yum_metadata_opts} ${snapshot_dir}
