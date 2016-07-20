@@ -7,15 +7,12 @@
 #
 # Written by Michel Jouvin - LAL/CNRS - 8/10/2009
 
-# Possible RPM group file name, relative to the directory containing the RPMs
-group_file_list="../base/comps.xml repodata/comps-sl.xml"
-
 force_update=0
-sl5_compatible=1
+sl5_compatible=0
 verbose=0
 
 usage () {
-  echo "Usage:   $(basename $0) [--debug] [--force] [--nosl5] repos_parent..."
+  echo "Usage:   $(basename $0) [--debug] [--force] [--nosl5|--sl5] repos_parent..."
   exit 1
 }
 
@@ -31,51 +28,59 @@ update_metadata () {
   [ ${verbose} -eq 1 ] && echo "Processing directory ${current_dir}..."
 
   local rpm_files=$(ls ${current_dir}/*-*.*.rpm 2>/dev/null)
-  if [ -z "${rpm_files}" -a -d "${current_dir}/repodata" ]
-  then
-    echo "Skipping ${current_dir}: OS-related repository"
-    return
-  fi
+  local is_repo_dir=0
 
   # Recursively process every subdirectory.
-  # If a subdirectory contains repodata but no RPMs (RPMs in subdirectories), stop
-  # processing it (this is probably an OS-related repository)
-  local repos_dirs=$(find -L ${current_dir} -maxdepth 1 -type d -or -type l | egrep -v "^${current_dir}\$")
-  for repo_dir in ${repos_dirs}
-  do
-     update_metadata ${repo_dir}
-  done
+  # If a subdirectory contains repodata but RPMs in subdirectories, stop
+  # processing it subdirectory (this is probably an OS-related repository or
+  # a repository with a similar structure).
+  # Variable is_repo_dir is used to flagged this type of repository.
+  if [ ! -d "${current_dir}/repodata" -a \
+       !  -d "${current_dir}/RPMS" -a \
+       !  -d "${current_dir}/Packages" -a \
+       !  -d "${current_dir}/SL" ]
+  then
+    is_repo_dir=0
+    local repos_dirs=$(find -L ${current_dir} -maxdepth 1 -type d -or -type l | egrep -v "^${current_dir}\$")
+    for repo_dir in ${repos_dirs}
+    do
+      update_metadata ${repo_dir}
+    done
+  else
+    is_repo_dir=1
+    # If the repository contains a 'comps' group filei in its metadata, assume that it is an OS repository
+    # and don't update metadata. A SL (SL5 repository layout) is treated as a special (comps.xml is out
+    # of the repo metadata).
+    if [ -d "${current_dir}/repodata" ]
+    then
+      rpm_group_file=$(find ${current_dir}/repodata -name '*comps*.xml')
+    elif [ -d "${current_dir}/SL" ]
+    then
+      echo "Skipping ${current_dir}: OS-related repository"
+      return
+    else
+      [ ${verbose} -eq 1 ] && echo "${current_dir} is a YUM repo: do not check subdirectories..."
+    fi
+  fi
 
   # Rebuild metadata in the current directory if there is RPMs in it
-  if [ -z "${rpm_files}" ]
+  if [ -z "${rpm_files}" -a ${is_repo_dir} -eq 0 ]
   then
     #echo "$dir doesn't contain RPM files. Ignoring..."
     continue
   fi
-  echo "Updating YUM metadata in $current_dir..."
-  
-  # Check if there is a RPM group file in one of the usual locations.
-  # This should happen only for OS repositories where these files are located in
-  # one of the following location:
-  #    - SL4: ../base/comps.xml
-  #    - SL5: repodata/comps-sl.xml
-  # Note that there is no easy way to tell a repository is for OS distribution, so
-  # the check is done for every repository.
-  
-  local rpm_group_file=''
-  for group_file in ${group_file_list}
-  do
-    if [ -f ${current_dir}/${group_file} ]
-    then
-      rpm_group_file="-g ${current_dir}/${group_file}"
-      echo "Detected RPM group file. Configuring createrepo to use it (${rpm_group_file})..."
-      break
-    fi
-  done
+  echo "Updating YUM metadata in '$current_dir'..."
   
   log_file=/tmp/$(basename $0)$(echo ${current_dir}|sed -e 's%/%_%g').err
-  #echo createrepo ${createrepo_opts} ${rpm_group_file} ${current_dir}
-  createrepo ${createrepo_opts} ${rpm_group_file} ${current_dir} >/dev/null 2> ${log_file}
+  if [ -z "${rpm_group_file}" ]
+  then
+    rpm_group_file_opt=''
+  else
+    rpm_group_file_opt="--groupfile ${rpm_group_file}"
+  fi
+  cmd="createrepo ${createrepo_opts} ${rpm_group_file_opt} ${current_dir}"
+  [ ${verbose} -eq 1 ] && echo "Executing command: ${cmd}"
+  ${cmd} >/dev/null 2> ${log_file}
   if [ $? -ne 0 ]
   then
     echo "Failed to update YUM metadata in $current_dir (see ${log_file} for details"
@@ -104,6 +109,10 @@ do
 
     --nosl5)
         sl5_compatible=0
+        ;;
+
+    --sl5)
+        sl5_compatible=1
         ;;
 
     *)
