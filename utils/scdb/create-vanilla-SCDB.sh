@@ -23,14 +23,14 @@ cluster_groups_default="grid"
 cluster_groups=
 
 
-# scdb source is typically a clone of GitHub scdb repo, switched to the appropriate
+# This script is typicall run from a clone of GitHub scdb repo, switched to the appropriate
 # version/branch. By default, the root of the clone is 2 level upper than the directory
-# containing this script (util/scdb)
+# containing this script (util/scdb). If this is not the case, SCDB sources will be downloaded from 
+# GitHub
 scdb_source="$(dirname $0)/../.."
 if [ ! -e "${scdb_source}/quattor.build.xml" ]
 then
-  echo "$(basename $0) must be run from a scdb repository clone".
-  exit 1
+    scdb_source=
 fi
 
 usage () {
@@ -189,13 +189,26 @@ fi
 mkdir ${git_clone_root}
 
 
-echo "Creating vanilla SCDB from $scdb_source in $scdb_dir..."
-cp -R ${scdb_source}/* ${scdb_dir}
-if [ $? -ne 0 ]
+if [ -n "${scdb_source}" ]
 then
-  echo "Error creating vanilla SCDB. Aborting..."
-  exit 1
+    echo "Creating vanilla SCDB from $scdb_source in $scdb_dir..."
+    cp -R ${scdb_source}/* ${scdb_dir}
+    if [ $? -ne 0 ]
+    then
+        echo "Error creating vanilla SCDB. Aborting..."
+        exit 1
+    fi
+else
+    github_scdb_url="${github_repos_url}/scdb"
+    echo "Downloading SCDB from ${github_scdb_url} in $scdb_dir..."
+    silent_command git clone ${github_scdb_url} ${scdb_dir}
+    if [ $? -ne 0 ]
+    then
+        echo "Error downloading vanilla SCDB. Aborting..."
+        exit 1
+    fi
 fi
+
 for external in ${scdb_external_list}
 do
   tmp=$(echo ${external} | sed -e 's/-/_/g')
