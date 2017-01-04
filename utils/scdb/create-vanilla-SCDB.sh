@@ -125,9 +125,6 @@ do
     then
       tl_download_args="${tl_download_args} $2"
       shift
-    else
-      echo "Invalid option ($1). Aborting..."
-      usage
     fi
     ;;
   esac
