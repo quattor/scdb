@@ -2,8 +2,9 @@
 
 repo_list="/root/yum/conf/sync_yum_repos.conf"
 yum_conf=/root/yum/conf/yum.conf
-reposync_cmd="reposync --norepopath --config=${yum_conf} --downloadcomps"
+reposync_cmd="reposync --norepopath --config=${yum_conf} --downloadcomps --download-metadata"
 update_yum_metadata_cmd="/root/quattor/scripts/update_yum_repos"
+update_yum_metadata_opts=""
 verbose=0
 update_yum_metadata=1
 repo_selected=
@@ -100,6 +101,9 @@ do
       purge)
         reposync_options="${reposync_options} --delete"
         ;;
+      sl5)
+        update_yum_metadata_opts="${update_yum_metadata_opts} --sl5"
+        ;;
       *)
         echo "Invalid sync_option (${option}). Aborting..."
         exit 2
@@ -115,7 +119,15 @@ do
   # Logging is done by the command
   if [ ${update_yum_metadata} -eq 1 ]
   then
-    ${update_yum_metadata_cmd} ${repo_dir}
+    # Ensure that repodata directory exists in ${repo_dir} to ensure that the the command
+    # used to update metadata doesn't process recursively all the directories containing packages
+    # instead of creating repository metadata if packages are in subdirectories.
+    if [ ! -e  ${repo_dir}/repodata ]
+    then
+      [ ${verbose} -ge 1 ] && echo "Creating repodata directory in repository ${repo_name} (${repo_dir})"
+      mkdir ${repo_dir}/repodata
+    fi
+    ${update_yum_metadata_cmd} ${update_yum_metadata_opts} ${repo_dir}
   else
     [ ${verbose} -ge 1 ] && echo "YUM metadata update disabled for repository ${repo_name} (${repo_dir})"
   fi
