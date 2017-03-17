@@ -337,7 +337,7 @@
               includes="${cluster.current} ${cluster.current}/profiles ${cluster.current}/site" />
     </path>
 
-    <panc verbose="true" warnings="off" checkDependencies="true"
+    <panc verbose="true" warnings="${pan.warnings}" checkDependencies="true"
           maxIteration="5000" debugTask="${compile.debug.task}" formats="${pan.formats}"
           outputDir="${outputdir}" includeroot="${cfg}" includes="${cluster.pan.includes}"
           logging="${pan.logging}"
