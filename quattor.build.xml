@@ -103,7 +103,7 @@
   
   <!-- Variables specific to update.vo.config target -->
   <property name="voConfigRootDir" value="${cfg}/grid"/>
-  <property name="voConfigIncludes" value="glite-*"/>
+  <property name="voConfigIncludes" value="umd-*"/>
   <property name="voConfigCertsNS" value="vo/certs"/>
   <property name="voConfigParamsNS" value="vo/params"/>
   <property name="voConfigSiteParamsNS" value="vo/site"/>
