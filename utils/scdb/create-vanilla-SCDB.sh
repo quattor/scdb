@@ -71,7 +71,7 @@ copy_scdb_external () {
     exit 20
   fi
   echo "Adding $1 version $2..."
-  svn export ${externals_root_url}/$2 ${scdb_dir}/external/$1 > /dev/null
+  svn export --force ${externals_root_url}/$2 ${scdb_dir}/external/$1 > /dev/null
   if [ $? -ne 0 ]
   then
     echo "Error adding $1. Aborting..."
@@ -103,6 +103,8 @@ do
 
   -F)
     remove_scdb=1
+    # Must be passed to the script used to download the template library
+    tl_download_args="${tl_download_args} $1"
     ;;
 
   --group)
